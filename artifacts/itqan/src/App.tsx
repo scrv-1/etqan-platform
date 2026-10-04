@@ -186,7 +186,9 @@ function SettingsPage({store,patch,onReset,dark,toggleTheme,flash}:{store:Store;
 }
 
 function App() {
-  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/,'')}><WorkspaceApp/></WouterRouter>;
+  return <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/,'')}><ImportedWorkspaceApp/></WouterRouter>;
 }
+
+import { WorkspaceApp as ImportedWorkspaceApp } from '@/components/workspace-app';
 
 export default App;
