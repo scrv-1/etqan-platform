@@ -1,0 +1,1 @@
+- [PDF.js document cleanup](pdfjs-document-cleanup.md) — `PDFDocumentLoadingTask`, not `PDFDocumentProxy`, owns worker destruction in the installed PDF.js version.
