@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "إتقان — مساحة التعلّم"
+description = "منصة تعلم عربية تساعد المتعلم على ربط المصادر بالمفاهيم وممارسة الاسترجاع وتتبع أدلة الفهم والإتقان."
+version = "1.0.0"
+id = "artifacts/itqan"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22934
+
+[services.development]
+run = "pnpm --filter @workspace/itqan run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/itqan", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/itqan/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22934"
+BASE_PATH = "/"

@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "kBcJJkuxXU7zI8_7JNHUB"
+uri = "file://itqan_master_prompt_ar.md"
+type = "text"
+title = "Master Prompt تأسيسي لإتقان"
+description = "موجز عربي قابل للتعديل لـ Replit Agent، يبدأ بمراجعة الخطة قبل أي تنفيذ ويحوّل اتجاهات إتقان إلى مراحل ونطاق واختبارات واضحة."
+logical_id = "9d5f949c-aaf5-4e7b-86f2-844b0903553d"
+content_hash = "sha256:5edda966425b4246c2e66a7199ecc145b330ca537d4333cdf0f2fb16bbbb2d60"
+size = 20143
+mtime_ms = 1791080350678
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/conversation:68174f30-d959-446b-971c-d4d2c53d1412/9d5f949c-aaf5-4e7b-86f2-844b0903553d/368b34cd-73ea-444d-8b7c-57361f015128"
+storage_version_token = "1791080352192435"
+content_type = "text/markdown"

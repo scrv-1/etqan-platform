@@ -1,6 +1,6 @@
-# [Project name]
+# إتقان
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+مساحة تعلم عربية تساعد المتعلم على ربط المصادر بالمفاهيم وممارسة الاسترجاع وتتبع أدلة الفهم.
 
 ## Run & Operate
 
@@ -22,19 +22,24 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/itqan/` — تطبيق الويب.
+- `artifacts/itqan/TESTING.md` — خطوات الاختبار اليدوي للمستخدم.
+- `lib/api-spec/openapi.yaml` — عقد API المشترك؛ لا يعدّل لتطبيق إتقان ما دام التطبيق يستخدم تخزين المتصفح المحلي.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- النسخة الأولى تعمل كتطبيق متصفح مستقل وتخزن بيانات المتعلم محليًا؛ لا يوجد تزامن بين الأجهزة أو حسابات في هذه المرحلة.
+- بيانات المثال التوضيحية ليست مخرجات ذكاء اصطناعي ولا تمثل إثباتًا على إتقان المستخدم.
+- يجب أن تبقى المفاهيم والعلاقات قابلة للتتبع إلى المصدر، وأن تبقى ثقة المستخدم منفصلة عن نتائج أدائه.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+نسخة أولى للمتعلم الفردي: إدارة مصادر نصية ومفاهيم وروابط معرفية، ممارسة أسئلة دون مساعدة AI، ومراجعة الأدلة المسجلة.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- تعامل مع كل جوانب المنتج على أنها قابلة للتعديل أو الحذف أو التحسين أو الإضافة؛ لا تعتبر البنود الحالية مواصفات جامدة.
+- العربية وRTL وتجربة متجاوبة لسطح المكتب والهاتف من متطلبات البداية.
 
 ## Gotchas
 
