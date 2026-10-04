@@ -11,6 +11,74 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /learning/capabilities:
+    get:
+      operationId: getLearningCapabilities
+      tags: [learning]
+      responses:
+        "200":
+          description: Available processing services
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningCapabilities"
+  /learning/article:
+    post:
+      operationId: extractArticle
+      tags: [learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArticleInput"
+      responses:
+        "200":
+          description: Public article text, not persisted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleResult"
+        default:
+          $ref: "#/components/responses/ProcessingError"
+  /learning/analyze:
+    post:
+      operationId: analyzeLearning
+      tags: [learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisInput"
+      responses:
+        "200":
+          description: Proposals with verified source quotations; learner review required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        default:
+          $ref: "#/components/responses/ProcessingError"
+  /learning/ocr:
+    post:
+      operationId: extractPageText
+      tags: [learning]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageImageInput"
+      responses:
+        "200":
+          description: Unverified OCR requiring visual review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageTextResult"
+        default:
+          $ref: "#/components/responses/ProcessingError"
   /healthz:
     get:
       operationId: healthCheck
@@ -25,7 +93,137 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 components:
+  responses:
+    ProcessingError:
+      description: Processing unavailable, invalid input, or rate limit
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProcessingFailure"
   schemas:
+    ProcessingFailure:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    LearningCapabilities:
+      type: object
+      required: [ai, ocr, youtube, message, maxAnalysisCharacters, maxSegments]
+      properties:
+        ai: { type: boolean }
+        ocr: { type: boolean }
+        youtube: { type: boolean }
+        message: { type: string }
+        maxAnalysisCharacters: { type: integer }
+        maxSegments: { type: integer }
+    SourceSegment:
+      type: object
+      required: [id, text]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 100 }
+        text: { type: string, minLength: 1, maxLength: 18000 }
+        page: { type: integer, minimum: 1 }
+        startSeconds: { type: number, minimum: 0 }
+        endSeconds: { type: number, minimum: 0 }
+    ArticleInput:
+      type: object
+      required: [url, consent]
+      properties:
+        url: { type: string, maxLength: 2000 }
+        consent: { type: boolean, enum: [true] }
+    ArticleResult:
+      type: object
+      required: [title, url, segments, warnings]
+      properties:
+        title: { type: string }
+        url: { type: string }
+        segments:
+          type: array
+          items: { $ref: "#/components/schemas/SourceSegment" }
+        warnings:
+          type: array
+          items: { type: string }
+    AnalysisInput:
+      type: object
+      required: [segments, consent]
+      properties:
+        consent: { type: boolean, enum: [true] }
+        segments:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: "#/components/schemas/SourceSegment" }
+    Grounding:
+      type: object
+      required: [segmentId, quote]
+      properties:
+        segmentId: { type: string, minLength: 1, maxLength: 100 }
+        quote: { type: string, minLength: 8, maxLength: 1000 }
+    ConceptProposal:
+      type: object
+      required: [key, title, description, kind, reference]
+      properties:
+        key: { type: string, minLength: 1, maxLength: 100 }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, minLength: 1, maxLength: 2000 }
+        kind: { type: string, enum: [concept, prerequisite, example] }
+        reference: { $ref: "#/components/schemas/Grounding" }
+    RelationProposal:
+      type: object
+      required: [fromKey, toKey, label, reference]
+      properties:
+        fromKey: { type: string }
+        toKey: { type: string }
+        label: { type: string, minLength: 1, maxLength: 200 }
+        reference: { $ref: "#/components/schemas/Grounding" }
+    QuestionProposal:
+      type: object
+      required: [conceptKey, prompt, kind, choices, correctChoice, answer, rubric, reference]
+      properties:
+        conceptKey: { type: string }
+        prompt: { type: string, minLength: 1, maxLength: 2000 }
+        kind: { type: string, enum: [mcq, flashcard, short] }
+        choices:
+          type: array
+          maxItems: 6
+          items: { type: string, minLength: 1, maxLength: 1000 }
+        correctChoice: { type: integer, minimum: 0, maximum: 5 }
+        answer: { type: string, minLength: 1, maxLength: 2000 }
+        rubric: { type: string, maxLength: 2000 }
+        reference: { $ref: "#/components/schemas/Grounding" }
+    AnalysisResult:
+      type: object
+      required: [concepts, relations, questions, warnings]
+      properties:
+        concepts:
+          type: array
+          maxItems: 15
+          items: { $ref: "#/components/schemas/ConceptProposal" }
+        relations:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/RelationProposal" }
+        questions:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/QuestionProposal" }
+        warnings:
+          type: array
+          items: { type: string }
+    PageImageInput:
+      type: object
+      required: [image, consent]
+      properties:
+        image: { type: string, maxLength: 3000000, pattern: "^data:image/(png|jpeg);base64," }
+        consent: { type: boolean, enum: [true] }
+    PageTextResult:
+      type: object
+      required: [text, warnings]
+      properties:
+        text: { type: string, maxLength: 18000 }
+        warnings:
+          type: array
+          items: { type: string }
     HealthStatus:
       type: object
       properties:
