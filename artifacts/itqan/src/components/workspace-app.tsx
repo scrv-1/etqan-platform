@@ -348,9 +348,11 @@ function StudyPage() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [outcome, setOutcome] = useState<Evidence['outcome'] | null>(null);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const questionStartedAt = useRef(Date.now());
   const questions = useMemo(() => ws.questions.slice(0, ws.modes.find(m => m.id === modeId)?.questionCount ?? ws.questions.length), [ws.questions, ws.modes, modeId]);
   const question = questions[questionIndex];
-  if (!question) return <div className="content"><PageHeading eyebrow="RETRIEVAL PRACTICE" title="جلسة الاسترجاع" description="أجب أولًا؛ إتقان لا يقيّم الإتقان من إجابة واحدة." action={<button className="button button-primary" onClick={() => setShowQuestionForm(v => !v)}><Plus size={15} /> أضف سؤالًا</button>} />{showQuestionForm && <ManualQuestionForm onClose={() => setShowQuestionForm(false)} />}<Empty title="لا توجد أسئلة بعد" copy="اقبل سؤالًا مقترحًا أو أضف سؤالًا من مصدرك." icon={Brain} action={<Link className="button button-secondary" href="/knowledge">افتح خريطة المعرفة</Link>} /></div>;
+  if (!question) return <div className="content"><PageHeading eyebrow="RETRIEVAL PRACTICE" title="جلسة الاسترجاع" description="أجب أولًا؛ إتقان لا يقيّم الإتقان من إجابة واحدة." action={<button className="button button-primary" onClick={() => { setEditingQuestion(null); setShowQuestionForm(v => !v); }}><Plus size={15} /> أضف سؤالًا</button>} />{showQuestionForm && <ManualQuestionForm onClose={() => setShowQuestionForm(false)} />}<Empty title="لا توجد أسئلة بعد" copy="اقبل سؤالًا مقترحًا أو أضف سؤالًا من مصدرك." icon={Brain} action={<Link className="button button-secondary" href="/knowledge">افتح خريطة المعرفة</Link>} /></div>;
   const segment = question.citation && ws.segments.find(s => s.id === question.citation?.segmentId);
   const snapshot = {
     prompt: question.prompt, kind: question.kind, choices: [...question.choices], correctChoice: question.correctChoice,
@@ -360,15 +362,15 @@ function StudyPage() {
   };
   const submit = (result: Evidence['outcome']) => {
     if (outcome || (question.kind === 'mcq' && choice === null)) return;
-    const evidence: Evidence = { id: uid(), questionId: question.id, conceptId: question.conceptId, sourceId: question.sourceId, snapshot, activity: question.kind, selectedChoice: question.kind === 'mcq' ? choice ?? undefined : undefined, responseText: question.kind === 'short' ? shortAnswer : undefined, outcome: question.kind === 'mcq' ? choice === question.correctChoice ? 'correct' : 'incorrect' : result, confidence, assisted: false, durationMs: 0, createdAt: nowIso() };
+    const evidence: Evidence = { id: uid(), questionId: question.id, conceptId: question.conceptId, sourceId: question.sourceId, snapshot, activity: question.kind, selectedChoice: question.kind === 'mcq' ? choice ?? undefined : undefined, responseText: question.kind === 'short' ? shortAnswer : undefined, outcome: question.kind === 'mcq' ? choice === question.correctChoice ? 'correct' : 'incorrect' : result, confidence, assisted: false, durationMs: Math.max(0, Date.now() - questionStartedAt.current), createdAt: nowIso() };
     update(w => ({ ...w, evidence: [...w.evidence, evidence] }));
     setOutcome(evidence.outcome);
     flash('حُفظت هذه المحاولة كدليل مستقل عن تقييمك لثقتك.');
   };
-  const next = () => { setQuestionIndex(i => (i + 1) % Math.max(questions.length, 1)); setChoice(null); setConfidence(3); setShortAnswer(''); setShowAnswer(false); setOutcome(null); };
+  const next = () => { setQuestionIndex(i => (i + 1) % Math.max(questions.length, 1)); setChoice(null); setConfidence(3); setShortAnswer(''); setShowAnswer(false); setOutcome(null); questionStartedAt.current = Date.now(); };
   return <div className="content">
-    <PageHeading eyebrow="RETRIEVAL PRACTICE" title="جلسة الاسترجاع" description="أجب دون مساعدة. المحاولة دليل واحد، لا حكم نهائي على إتقانك." action={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><label className="sr-only" htmlFor="study-mode">نمط الجلسة</label><select id="study-mode" value={modeId} onChange={e => { setModeId(e.target.value); setQuestionIndex(0); setOutcome(null); setChoice(null); setShowAnswer(false); }}>{ws.modes.map(m => <option key={m.id} value={m.id}>{m.name} · {m.questionCount}</option>)}</select><button className="button button-secondary" onClick={() => setShowQuestionForm(v => !v)}><Plus size={14} /> سؤال</button><Link className="button button-secondary" href="/progress">الأثر</Link></div>} />
-    {showQuestionForm && <ManualQuestionForm onClose={() => setShowQuestionForm(false)} />}
+    <PageHeading eyebrow="RETRIEVAL PRACTICE" title="جلسة الاسترجاع" description="أجب دون مساعدة. المحاولة دليل واحد، لا حكم نهائي على إتقانك." action={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><label className="sr-only" htmlFor="study-mode">نمط الجلسة</label><select id="study-mode" value={modeId} onChange={e => { setModeId(e.target.value); setQuestionIndex(0); setOutcome(null); setChoice(null); setShowAnswer(false); }}>{ws.modes.map(m => <option key={m.id} value={m.id}>{m.name} · {m.questionCount}</option>)}</select><button className="button button-secondary" onClick={() => { setEditingQuestion(null); setShowQuestionForm(v => !v); }}><Plus size={14} /> سؤال</button><Link className="button button-secondary" href="/progress">الأثر</Link></div>} />
+    {showQuestionForm && <ManualQuestionForm question={editingQuestion} onClose={() => { setShowQuestionForm(false); setEditingQuestion(null); }} />}
     <section className="card study-panel" data-testid="panel-study">
       <div className="study-progress"><span>سؤال {questionIndex + 1} من {questions.length}</span><span className="tag">{question.kind === 'mcq' ? 'اختيار من متعدد' : question.kind === 'short' ? 'إجابة قصيرة' : 'بطاقة استرجاع'}</span></div>
       <div className="question" data-testid="text-question">{question.prompt}</div>
@@ -382,18 +384,19 @@ function StudyPage() {
       {outcome && <div className="answer-feedback" role="status" data-testid="status-answer-feedback"><b>{outcome === 'correct' ? 'إجابة صحيحة' : outcome === 'incorrect' ? 'إجابة غير صحيحة' : outcome === 'self-met' ? 'قيّمتها: تذكرتها' : outcome === 'self-partial' ? 'قيّمتها: تذكرت جزءًا' : 'قيّمتها: لم أتذكرها'}</b>{question.kind === 'mcq' && <div>{question.answer}</div>}<p>ثقتك {confidence}/5 منفصلة عن نتيجة الاسترجاع.</p><Citation ws={ws} sourceId={question.sourceId} citation={question.citation} label={`ارجع إلى ${question.location}`} /><div className="form-actions"><button className="button button-primary" onClick={next}>السؤال التالي <ArrowLeft size={14} /></button><Link href="/progress" className="button button-secondary">سجل الأثر</Link></div></div>}
     </section>
     <div className="section-head"><h2 className="section-title">بنك أسئلتك</h2><span className="tag">{ws.questions.length.toLocaleString('ar')}</span></div>
-    <div className="list-stack">{ws.questions.map(q => <article className="card evidence-row" key={q.id}><div className="row-main"><b className="row-title">{q.prompt}</b><span className="row-meta">{q.kind} · {ws.concepts.find(c => c.id === q.conceptId)?.title} · {ws.sources.find(s => s.id === q.sourceId)?.title}</span><Citation ws={ws} sourceId={q.sourceId} citation={q.citation} label={q.location} /></div><button className="icon-button" aria-label={`حذف السؤال: ${q.prompt}`} onClick={() => { if (window.confirm('سيُحذف السؤال ومحاولاته المسجلة المرتبطة به. هل تريد المتابعة؟')) cascadeDelete({ type: 'question', id: q.id }); }}><Trash2 size={15} /></button></article>)}</div>
+    <div className="list-stack">{ws.questions.map(q => <article className="card evidence-row" key={q.id}><div className="row-main"><b className="row-title">{q.prompt}</b><span className="row-meta">{q.kind} · {ws.concepts.find(c => c.id === q.conceptId)?.title} · {ws.sources.find(s => s.id === q.sourceId)?.title}</span><Citation ws={ws} sourceId={q.sourceId} citation={q.citation} label={q.location} /></div><div className="row-actions"><button className="icon-button" aria-label={`تعديل السؤال: ${q.prompt}`} onClick={() => { setEditingQuestion(q); setShowQuestionForm(true); }}><Settings size={15} /></button><button className="icon-button" aria-label={`حذف السؤال: ${q.prompt}`} onClick={() => { if (window.confirm('سيُحذف السؤال ومحاولاته المسجلة المرتبطة به. هل تريد المتابعة؟')) cascadeDelete({ type: 'question', id: q.id }); }}><Trash2 size={15} /></button></div></article>)}</div>
   </div>;
 }
 
-function ManualQuestionForm({ onClose }: { onClose: () => void }) {
+function ManualQuestionForm({ question, onClose }: { question?: Question | null; onClose: () => void }) {
   const { ws, update, flash } = useWorkspace();
-  const [kind, setKind] = useState<QuestionKind>('mcq');
-  const [conceptId, setConceptId] = useState(ws.concepts[0]?.id ?? '');
-  const [segmentId, setSegmentId] = useState('');
-  const [prompt, setPrompt] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [choices, setChoices] = useState('');
+  const [kind, setKind] = useState<QuestionKind>(question?.kind ?? 'mcq');
+  const [conceptId, setConceptId] = useState(question?.conceptId ?? ws.concepts[0]?.id ?? '');
+  const [segmentId, setSegmentId] = useState(question?.citation?.segmentId ?? '');
+  const [prompt, setPrompt] = useState(question?.prompt ?? '');
+  const [answer, setAnswer] = useState(question?.answer ?? '');
+  const [choices, setChoices] = useState(question?.choices.join('\n') ?? '');
+  const [correct, setCorrect] = useState(question?.correctChoice ?? 0);
   const concept = ws.concepts.find(c => c.id === conceptId);
   const segments = ws.segments.filter(s => s.sourceId === concept?.sourceId);
   const save = (e: FormEvent) => {
@@ -401,19 +404,19 @@ function ManualQuestionForm({ onClose }: { onClose: () => void }) {
     const options = kind === 'mcq' ? choices.split('\n').map(v => v.trim()).filter(Boolean) : [];
     if (!concept || !prompt.trim() || !answer.trim() || (kind === 'mcq' && options.length < 2)) return;
     const segment = segments.find(s => s.id === segmentId);
-    const question: Question = { id: uid(), kind, prompt: prompt.trim(), choices: options, correctChoice: 0, answer: answer.trim(), rubric: '', conceptId, sourceId: concept.sourceId, citation: segment ? { segmentId: segment.id } : null, location: segment ? locationLabel(segment) : 'بلا إحالة مصدرية', origin: 'manual', updatedAt: nowIso() };
-    update(w => ({ ...w, sample: false, questions: [...w.questions, question] }));
-    flash('أُضيف السؤال المحلي. لا يصححه الذكاء الاصطناعي.');
+    const item: Question = { id: question?.id ?? uid(), kind, prompt: prompt.trim(), choices: options, correctChoice: kind === 'mcq' ? correct : 0, answer: answer.trim(), rubric: question?.rubric ?? '', conceptId, sourceId: concept.sourceId, citation: segment ? { segmentId: segment.id } : null, location: segment ? locationLabel(segment) : 'بلا إحالة مصدرية', origin: question?.origin ?? 'manual', updatedAt: nowIso() };
+    update(w => ({ ...w, sample: false, questions: question ? w.questions.map(q => q.id === question.id ? item : q) : [...w.questions, item] }));
+    flash(question ? 'حُفظ تعديل السؤال، وبقيت المحاولات السابقة مرتبطة بنسختها.' : 'أُضيف السؤال المحلي. لا يصححه الذكاء الاصطناعي.');
     onClose();
   };
   if (!ws.concepts.length) return <div className="notice">أضف مفهومًا مرتبطًا بمصدر قبل إنشاء سؤال.</div>;
   return <form className="card form-card" onSubmit={save} data-testid="form-question">
-    <h3 className="setting-title">أضف سؤالًا يدويًا</h3>
+    <h3 className="setting-title">{question ? 'تعديل السؤال' : 'أضف سؤالًا يدويًا'}</h3>
     <div className="form-grid">
       <div className="field"><label htmlFor="question-kind">النشاط</label><select id="question-kind" value={kind} onChange={e => setKind(e.target.value as QuestionKind)}><option value="mcq">اختيار من متعدد</option><option value="flashcard">بطاقة استرجاع</option><option value="short">إجابة قصيرة (تقييم ذاتي)</option></select></div>
       <div className="field"><label htmlFor="question-concept">المفهوم</label><select id="question-concept" value={conceptId} onChange={e => { setConceptId(e.target.value); setSegmentId(''); }}>{ws.concepts.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></div>
       <div className="field full"><label htmlFor="question-prompt">السؤال أو وجه البطاقة</label><textarea id="question-prompt" required value={prompt} onChange={e => setPrompt(e.target.value)} /></div>
-      {kind === 'mcq' && <div className="field full"><label htmlFor="question-choices">الخيارات، واحد في كل سطر (الأول هو الصحيح)</label><textarea id="question-choices" required value={choices} onChange={e => setChoices(e.target.value)} /></div>}
+      {kind === 'mcq' && <><div className="field full"><label htmlFor="question-choices">الخيارات، واحد في كل سطر</label><textarea id="question-choices" required value={choices} onChange={e => setChoices(e.target.value)} /></div><div className="field"><label htmlFor="question-correct">الإجابة الصحيحة</label><select id="question-correct" value={correct} onChange={e => setCorrect(Number(e.target.value))}>{choices.split('\n').map((line, i) => <option key={i} value={i}>{line.trim() || `الخيار ${i + 1}`}</option>)}</select></div></>}
       <div className="field full"><label htmlFor="question-answer">الإجابة المرجعية (لا يوجد تصحيح آلي للإجابة القصيرة)</label><textarea id="question-answer" required value={answer} onChange={e => setAnswer(e.target.value)} /></div>
       <div className="field full"><label htmlFor="question-segment">إحالة إلى مقطع (اختياري)</label><select id="question-segment" value={segmentId} onChange={e => setSegmentId(e.target.value)}><option value="">بلا إحالة</option>{segments.map(s => <option key={s.id} value={s.id}>{locationLabel(s)} · {s.text.slice(0, 60)}</option>)}</select></div>
     </div>
@@ -431,25 +434,31 @@ function ProgressPage() {
 
 function Metric({ value, label }: { value: number; label: string }) { return <div className="card metric-card"><div className="metric-value">{value.toLocaleString('ar')}</div><div className="metric-label">{label}</div></div>; }
 
-function SettingsPage() {
-  const { ws, startFresh } = useWorkspace();
+function SettingsPage({ dark, toggleTheme }: { dark: boolean; toggleTheme: () => void }) {
+  const { ws, update, startFresh, flash } = useWorkspace();
   const [resetError, setResetError] = useState('');
+  const [modeName, setModeName] = useState('');
+  const [modeCount, setModeCount] = useState(3);
+  const [editingMode, setEditingMode] = useState<string | null>(null);
   const reset = async () => {
     if (!window.confirm('سيُحذف كل المحتوى والملفات المحلية. نزّل نسخة احتياطية أولًا إن أردت الاحتفاظ بها. هل تريد المتابعة؟')) return;
     try { await startFresh(false); setResetError(''); }
     catch (e) { setResetError(e instanceof Error ? e.message : 'تعذر إعادة الضبط.'); }
   };
+  const saveMode = (e: FormEvent) => {
+    e.preventDefault();
+    if (!modeName.trim()) return;
+    const mode: StudyMode = { id: editingMode ?? uid(), name: modeName.trim(), questionCount: modeCount, allowHints: false };
+    update(w => ({ ...w, modes: editingMode ? w.modes.map(m => m.id === editingMode ? mode : m) : [...w.modes, mode] }));
+    setModeName(''); setEditingMode(null); flash('حُفظ نمط الجلسة.');
+  };
   return <div className="content"><PageHeading eyebrow="YOUR PRIVACY, YOUR CHOICE" title="إعدادات مساحتك" description="لا حساب ولا مزامنة تلقائية. هذه البيانات تخص المتصفح والجهاز الحالي." />
     <section className="card setting-section"><h2 className="setting-title">تخزين محلي</h2><p className="setting-copy">المصادر والملفات والمفاهيم وسجل التعلم محفوظة في IndexedDB على هذا المتصفح. قد يمسح المتصفح بيانات الموقع؛ لا تعتبره نسخة احتياطية.</p><div className="notice"><ShieldCheck size={15} style={{ verticalAlign: 'middle', marginLeft: 7 }} /> نزّل ملف ZIP، ثم احفظه بنفسك في iCloud أو Google Drive أو مكان تختاره. لا يوجد تكامل أو مزامنة آلية.</div></section>
     <section className="card setting-section"><h2 className="setting-title">نسخ البيانات</h2><p className="setting-copy">يتضمن ZIP الملفات الأصلية والإحالات وبيانات التعلّم، مع فحص سلامة ومعاينة قبل الاستبدال.</p><BackupPanel /></section>
-    <section className="card setting-section"><h2 className="setting-title">أنماط الجلسة</h2><p className="setting-copy">حدّد عدد الأسئلة للجلسة. الجلسة الحالية تعرض كل أسئلة المساحة.</p>{ws.modes.map(m => <div className="mode-item" key={m.id}><b>{m.name}</b><span>{m.questionCount} أسئلة · بلا تلميحات</span></div>)}</section>
-    <section className="card setting-section"><h2 className="setting-title">الوضع الليلي</h2><p className="setting-copy">تغيير بصري يُحفظ محليًا على هذا الجهاز.</p><ThemeButton /></section>
+    <section className="card setting-section"><h2 className="setting-title">أنماط الجلسة</h2><p className="setting-copy">تحدد الحد الأعلى لعدد الأسئلة في جلسة الاسترجاع.</p>{ws.modes.map(m => <div className="mode-item" key={m.id}><span><b>{m.name}</b><span className="setting-copy" style={{ margin: '0 8px' }}>{m.questionCount} أسئلة · بلا تلميحات</span></span><div className="row-actions"><button className="icon-button" aria-label={`تعديل نمط ${m.name}`} onClick={() => { setEditingMode(m.id); setModeName(m.name); setModeCount(m.questionCount); }}><Settings size={15} /></button><button className="icon-button" aria-label={`حذف نمط ${m.name}`} onClick={() => { if (window.confirm(`حذف نمط «${m.name}»؟`)) update(w => ({ ...w, modes: w.modes.filter(x => x.id !== m.id) })); }}><Trash2 size={15} /></button></div></div>)}
+      <form className="form-grid" style={{ marginTop: 14 }} onSubmit={saveMode}><div className="field"><label htmlFor="mode-name">اسم النمط</label><input id="mode-name" required value={modeName} onChange={e => setModeName(e.target.value)} placeholder="مثل: مراجعة قصيرة" /></div><div className="field"><label htmlFor="mode-count">عدد الأسئلة</label><select id="mode-count" value={modeCount} onChange={e => setModeCount(Number(e.target.value))}><option value={3}>٣ أسئلة</option><option value={5}>٥ أسئلة</option><option value={8}>٨ أسئلة</option></select></div><div className="form-actions"><button className="button button-secondary"><Plus size={14} />{editingMode ? 'حفظ النمط' : 'أضف نمطًا'}</button>{editingMode && <button type="button" className="button button-quiet" onClick={() => { setEditingMode(null); setModeName(''); }}>إلغاء</button>}</div></form>
+    </section>
+    <section className="card setting-section"><h2 className="setting-title">الوضع الليلي</h2><p className="setting-copy">تغيير بصري يُحفظ محليًا على هذا الجهاز.</p><button className="button button-secondary" onClick={toggleTheme}>{dark ? <Sun size={15} /> : <Moon size={15} />}{dark ? 'استخدم الفاتح' : 'استخدم الداكن'}</button></section>
     <section className="card setting-section"><h2 className="setting-title">إعادة ضبط المحتوى</h2><p className="setting-copy">يمسح كل البيانات والملفات المحلية ثم ينشئ مساحة فارغة. لا يمكن التراجع دون نسخة احتياطية.</p>{resetError && <div className="notice notice-danger">{resetError}</div>}<button className="button button-danger" onClick={reset} data-testid="button-reset-data"><Trash2 size={15} /> احذف المحتوى المحلي</button></section>
   </div>;
-}
-
-function ThemeButton() {
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
-  const toggle = () => setDark(d => { const next = !d; document.documentElement.classList.toggle('dark', next); try { localStorage.setItem('itqan-theme', next ? 'dark' : 'light'); } catch { /* ignore visual preference persistence failure */ } return next; });
-  return <button className="button button-secondary" onClick={toggle}>{dark ? <Sun size={15} /> : <Moon size={15} />}{dark ? 'استخدم الفاتح' : 'استخدم الداكن'}</button>;
 }
