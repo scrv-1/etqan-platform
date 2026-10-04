@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { getReviewPlan, REVIEW_INTERVAL_DAYS } from './review';
+import { createSeed } from './seed';
+import { validateWorkspaceShape } from './validate';
 import type { Evidence, Outcome } from './types';
 
 const start = Date.parse('2026-10-01T12:00:00.000Z');
 const DAY = 24 * 60 * 60 * 1000;
+const AGAIN_DELAY_MS = 10 * 60 * 1000;
 function item(questionId: string, outcome: Outcome, at: number, confidence = 1): Evidence {
   return {
     id: `${questionId}-${at}`, questionId, conceptId: 'concept', sourceId: 'source',
@@ -16,7 +19,7 @@ assert.equal(getReviewPlan('q-new', [], start).status, 'new');
 assert.equal(getReviewPlan('q-new', [], start).isDue, true);
 
 const firstGood = item('q-good', 'correct', start, 1);
-const nextDay = getReviewPlan('q-good', [firstGood], start + 1);
+const nextDay = getReviewPlan('q-good', [firstGood], start + DAY);
 assert.equal(nextDay.box, 1);
 assert.equal(nextDay.dueAt?.getTime(), start + DAY);
 assert.equal(nextDay.isDue, true);
@@ -34,9 +37,14 @@ const missed = getReviewPlan('q-missed', [item('q-missed', 'incorrect', start)],
 assert.equal(missed.isDue, true);
 assert.equal(missed.box, 0);
 
-const resetAfterMiss = getReviewPlan('q-reset', [item('q-reset', 'correct', start), item('q-reset', 'self-missed', start + DAY), item('q-reset', 'correct', start + DAY + AGAIN_DELAY_MS)], start + 2 * DAY);
+const resetAfterMiss = getReviewPlan('q-reset', [item('q-reset', 'correct', start), item('q-reset', 'self-missed', start + DAY), item('q-reset', 'correct', start + DAY + 10 * 60 * 1000)], start + 2 * DAY);
 assert.equal(resetAfterMiss.box, 1);
 assert.equal(resetAfterMiss.dueAt?.getTime(), start + DAY + AGAIN_DELAY_MS + DAY);
-assert.equal(getReviewPlan('q-future', [firstGood], start).status, 'scheduled');
+assert.equal(getReviewPlan('q-future', [item('q-future', 'correct', start)], start).status, 'scheduled');
+
+const workspace = createSeed();
+assert.ok(workspace.questions[0], 'sample workspace has a question for the validation regression');
+workspace.evidence.push(item(workspace.questions[0].id, 'correct', start, 5));
+assert.deepEqual(validateWorkspaceShape(workspace), [], 'the visible five-point confidence scale must survive reload validation');
 
 console.log('review schedule checks passed');

@@ -20,6 +20,7 @@ import { extractPageText } from '@workspace/api-client-react';
 import { pageImageDataUrl } from '@/lib/ingest/pdf';
 import { describeImpact, impactOf } from '@/lib/cascade';
 import { formatTime, nowIso, uid } from '@/lib/util';
+import { getReviewPlan } from '@/lib/review';
 import type { Citation, Concept, Evidence, Question, QuestionKind, Relation, Segment, Source, StudyMode, Workspace } from '@/lib/types';
 
 const queryClient = new QueryClient();
@@ -31,6 +32,23 @@ function fmtKind(kind: Source['kind']) {
 function citeLocation(segment: Segment | undefined) {
   if (!segment) return 'الموضع غير متاح';
   return locationLabel(segment);
+}
+
+function dueReviewIds(questions: Question[], evidence: Evidence[]) {
+  return questions
+    .map(question => ({ question, plan: getReviewPlan(question.id, evidence) }))
+    .filter(item => item.plan.isDue)
+    .sort((a, b) => (a.plan.dueAt?.getTime() ?? 0) - (b.plan.dueAt?.getTime() ?? 0))
+    .map(item => item.question.id);
+}
+
+function reviewDelayLabel(delayMs: number) {
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (delayMs < hour) return `${Math.max(1, Math.round(delayMs / minute)).toLocaleString('ar')} دقيقة`;
+  if (delayMs < day) return `${Math.max(1, Math.round(delayMs / hour)).toLocaleString('ar')} ساعة`;
+  return `${Math.round(delayMs / day).toLocaleString('ar')} ${delayMs === day ? 'يوم' : 'أيام'}`;
 }
 
 function Citation({ ws, sourceId, citation, label }: { ws: Workspace; sourceId: string; citation: Citation | null; label?: string }) {
@@ -78,6 +96,7 @@ function HomePage() {
   const { ws } = useWorkspace();
   const { caps } = useCapabilities();
   const next = ws.questions.find(q => !ws.evidence.some(e => e.questionId === q.id)) ?? ws.questions[0];
+  const dueCount = dueReviewIds(ws.questions, ws.evidence).length;
   return <div className="content">
     <PageHeading eyebrow="YOUR OWN LEARNING SPACE" title="أهلًا بك في إتقان" description="ابدأ بمصدر، اربط الأفكار، ثم اختبر ما تستطيع استرجاعه." action={<Link className="button button-primary" href="/sources" data-testid="button-add-source"><Plus size={15} /> أضف مصدرًا</Link>} />
     {ws.sample && <SampleNote />}
@@ -94,6 +113,7 @@ function HomePage() {
     <div className="section-head"><h2 className="section-title">خطوتك التالية</h2></div>
     <div className="next-grid">
       <Link href={next ? '/study' : '/sources'} className="card action-card" style={{ textDecoration: 'none', color: 'inherit' }}><span className="action-icon"><Brain size={20} /></span><span className="row-main"><span className="action-title">{next ? `راجع: ${next.prompt}` : 'أضف أول مصدر'}</span><span className="action-caption">{next ? 'لا تظهر الإجابة قبل محاولتك.' : 'PDF أو مستند أو صفحة ويب أو نص.'}</span></span><ChevronLeft size={17} /></Link>
+      {dueCount > 0 && <Link href="/study?due=1" className="card action-card" style={{ textDecoration: 'none', color: 'inherit' }} data-testid="button-review-due"><span className="action-icon"><Brain size={20} /></span><span className="row-main"><span className="action-title">مراجعة مستحقة</span><span className="action-caption">{dueCount.toLocaleString('ar')} سؤالًا جديدًا أو حان موعد استرجاعه.</span></span><ChevronLeft size={17} /></Link>}
       <Link href="/knowledge" className="card action-card" style={{ textDecoration: 'none', color: 'inherit' }}><span className="action-icon"><Network size={20} /></span><span><span className="action-title">شبكة الأفكار</span><span className="action-caption">{ws.concepts.length} مفهومًا و{ws.relations.length} علاقة؛ راجع ما هو مقترح قبل اعتماده.</span></span><ArrowDownLeft size={17} /></Link>
     </div>
     <div className="notice" style={{ marginTop: 18 }}><ShieldCheck size={15} style={{ verticalAlign: 'middle', marginLeft: 7 }} /> المحتوى يبقى في هذا المتصفح. التحليل وOCR لا يرسلان شيئًا دون موافقتك الصريحة.</div>
@@ -341,18 +361,24 @@ function ManualConceptForm() {
 function StudyPage() {
   const { ws, update, flash, cascadeDelete } = useWorkspace();
   const [modeId, setModeId] = useState(ws.modes[0]?.id ?? '');
+  const [reviewOnly, setReviewOnly] = useState(() => new URLSearchParams(window.location.search).get('due') === '1');
+  const [reviewQuestionIds, setReviewQuestionIds] = useState(() => dueReviewIds(ws.questions, ws.evidence));
   const [questionIndex, setQuestionIndex] = useState(0);
   const [choice, setChoice] = useState<number | null>(null);
   const [confidence, setConfidence] = useState(3);
   const [shortAnswer, setShortAnswer] = useState('');
   const [showAnswer, setShowAnswer] = useState(false);
   const [outcome, setOutcome] = useState<Evidence['outcome'] | null>(null);
+  const [plannedDelayMs, setPlannedDelayMs] = useState<number | null>(null);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const questionStartedAt = useRef(Date.now());
-  const questions = useMemo(() => ws.questions.slice(0, ws.modes.find(m => m.id === modeId)?.questionCount ?? ws.questions.length), [ws.questions, ws.modes, modeId]);
+  const questions = useMemo(() => reviewOnly
+    ? reviewQuestionIds.map(id => ws.questions.find(q => q.id === id)).filter((q): q is Question => !!q)
+    : ws.questions.slice(0, ws.modes.find(m => m.id === modeId)?.questionCount ?? ws.questions.length),
+  [ws.questions, ws.modes, modeId, reviewOnly, reviewQuestionIds]);
   const question = questions[questionIndex];
-  if (!question) return <div className="content"><PageHeading eyebrow="RETRIEVAL PRACTICE" title="جلسة الاسترجاع" description="أجب أولًا؛ إتقان لا يقيّم الإتقان من إجابة واحدة." action={<button className="button button-primary" onClick={() => { setEditingQuestion(null); setShowQuestionForm(v => !v); }}><Plus size={15} /> أضف سؤالًا</button>} />{showQuestionForm && <ManualQuestionForm onClose={() => setShowQuestionForm(false)} />}<Empty title="لا توجد أسئلة بعد" copy="اقبل سؤالًا مقترحًا أو أضف سؤالًا من مصدرك." icon={Brain} action={<Link className="button button-secondary" href="/knowledge">افتح خريطة المعرفة</Link>} /></div>;
+  if (!question) return <div className="content"><PageHeading eyebrow="RETRIEVAL PRACTICE" title={reviewOnly ? 'المراجعة المستحقة' : 'جلسة الاسترجاع'} description={reviewOnly ? 'لا توجد أسئلة مستحقة الآن؛ ستظهر هنا عندما يحين موعدها.' : 'أجب أولًا؛ إتقان لا يقيّم الإتقان من إجابة واحدة.'} action={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{reviewOnly && <button className="button button-secondary" onClick={() => { setReviewOnly(false); setQuestionIndex(0); setOutcome(null); setPlannedDelayMs(null); }}>كل الأسئلة</button>}<button className="button button-primary" onClick={() => { setEditingQuestion(null); setShowQuestionForm(v => !v); }}><Plus size={15} /> أضف سؤالًا</button></div>} />{showQuestionForm && <ManualQuestionForm onClose={() => setShowQuestionForm(false)} />}{reviewOnly ? <Empty title="انتهت مراجعاتك المستحقة" copy="قدّم المحاولة التالية عند موعد البطاقة؛ لا يلزم تشغيل تنبيه." icon={Brain} action={<button className="button button-secondary" onClick={() => { setReviewOnly(false); setQuestionIndex(0); setOutcome(null); setPlannedDelayMs(null); }}>تابع كل الأسئلة</button>} /> : <Empty title="لا توجد أسئلة بعد" copy="اقبل سؤالًا مقترحًا أو أضف سؤالًا من مصدرك." icon={Brain} action={<Link className="button button-secondary" href="/knowledge">افتح خريطة المعرفة</Link>} />}</div>;
   const segment = question.citation && ws.segments.find(s => s.id === question.citation?.segmentId);
   const snapshot = {
     prompt: question.prompt, kind: question.kind, choices: [...question.choices], correctChoice: question.correctChoice,
@@ -363,13 +389,20 @@ function StudyPage() {
   const submit = (result: Evidence['outcome']) => {
     if (outcome || (question.kind === 'mcq' && choice === null)) return;
     const evidence: Evidence = { id: uid(), questionId: question.id, conceptId: question.conceptId, sourceId: question.sourceId, snapshot, activity: question.kind, selectedChoice: question.kind === 'mcq' ? choice ?? undefined : undefined, responseText: question.kind === 'short' ? shortAnswer : undefined, outcome: question.kind === 'mcq' ? choice === question.correctChoice ? 'correct' : 'incorrect' : result, confidence, assisted: false, durationMs: Math.max(0, Date.now() - questionStartedAt.current), createdAt: nowIso() };
+    const reviewPlan = getReviewPlan(question.id, [...ws.evidence, evidence]);
     update(w => ({ ...w, evidence: [...w.evidence, evidence] }));
     setOutcome(evidence.outcome);
+    setPlannedDelayMs(reviewPlan.delayMs);
     flash('حُفظت هذه المحاولة كدليل مستقل عن تقييمك لثقتك.');
   };
-  const next = () => { setQuestionIndex(i => (i + 1) % Math.max(questions.length, 1)); setChoice(null); setConfidence(3); setShortAnswer(''); setShowAnswer(false); setOutcome(null); questionStartedAt.current = Date.now(); };
+  const next = () => { if (reviewOnly) { setReviewQuestionIds(ids => ids.filter(id => id !== question.id)); setQuestionIndex(0); } else setQuestionIndex(i => (i + 1) % Math.max(questions.length, 1)); setChoice(null); setConfidence(3); setShortAnswer(''); setShowAnswer(false); setOutcome(null); setPlannedDelayMs(null); questionStartedAt.current = Date.now(); };
+  const toggleReviewOnly = () => {
+    if (reviewOnly) { setReviewOnly(false); setQuestionIndex(0); }
+    else { setReviewQuestionIds(dueReviewIds(ws.questions, ws.evidence)); setReviewOnly(true); setQuestionIndex(0); }
+    setChoice(null); setConfidence(3); setShortAnswer(''); setShowAnswer(false); setOutcome(null); setPlannedDelayMs(null); questionStartedAt.current = Date.now();
+  };
   return <div className="content">
-    <PageHeading eyebrow="RETRIEVAL PRACTICE" title="جلسة الاسترجاع" description="أجب دون مساعدة. المحاولة دليل واحد، لا حكم نهائي على إتقانك." action={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><label className="sr-only" htmlFor="study-mode">نمط الجلسة</label><select id="study-mode" value={modeId} onChange={e => { setModeId(e.target.value); setQuestionIndex(0); setOutcome(null); setChoice(null); setShowAnswer(false); }}>{ws.modes.map(m => <option key={m.id} value={m.id}>{m.name} · {m.questionCount}</option>)}</select><button className="button button-secondary" onClick={() => { setEditingQuestion(null); setShowQuestionForm(v => !v); }}><Plus size={14} /> سؤال</button><Link className="button button-secondary" href="/progress">الأثر</Link></div>} />
+    <PageHeading eyebrow="RETRIEVAL PRACTICE" title={reviewOnly ? 'المراجعة المستحقة' : 'جلسة الاسترجاع'} description={reviewOnly ? 'تُرتب الأسئلة حسب موعدها، ويُحسب الموعد من نتيجة الاسترجاع السابقة.' : 'أجب دون مساعدة. المحاولة دليل واحد، لا حكم نهائي على إتقانك.'} action={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{!reviewOnly && <><label className="sr-only" htmlFor="study-mode">نمط الجلسة</label><select id="study-mode" value={modeId} onChange={e => { setModeId(e.target.value); setQuestionIndex(0); setOutcome(null); setChoice(null); setShowAnswer(false); setPlannedDelayMs(null); }}>{ws.modes.map(m => <option key={m.id} value={m.id}>{m.name} · {m.questionCount}</option>)}</select></>}<button className="button button-secondary" aria-pressed={reviewOnly} onClick={toggleReviewOnly}>{reviewOnly ? 'كل الأسئلة' : `المستحق (${dueReviewIds(ws.questions, ws.evidence).length})`}</button><button className="button button-secondary" onClick={() => { setEditingQuestion(null); setShowQuestionForm(v => !v); }}><Plus size={14} /> سؤال</button><Link className="button button-secondary" href="/progress">الأثر</Link></div>} />
     {showQuestionForm && <ManualQuestionForm question={editingQuestion} onClose={() => { setShowQuestionForm(false); setEditingQuestion(null); }} />}
     <section className="card study-panel" data-testid="panel-study">
       <div className="study-progress"><span>سؤال {questionIndex + 1} من {questions.length}</span><span className="tag">{question.kind === 'mcq' ? 'اختيار من متعدد' : question.kind === 'short' ? 'إجابة قصيرة' : 'بطاقة استرجاع'}</span></div>
@@ -381,7 +414,7 @@ function StudyPage() {
       {!outcome && <fieldset className="confidence-options" style={{ border: 0, padding: 0 }}><legend className="setting-copy">ثقتك قبل النتيجة</legend>{[1, 2, 3, 4, 5].map(x => <button type="button" key={x} className={`confidence-chip ${confidence === x ? 'selected' : ''}`} aria-pressed={confidence === x} onClick={() => setConfidence(x)}>{x} / 5</button>)}</fieldset>}
       {question.kind === 'mcq' && !outcome && <button className="button button-primary" style={{ marginTop: 15 }} disabled={choice === null} onClick={() => submit(choice === question.correctChoice ? 'correct' : 'incorrect')}>تحقق من إجابتي</button>}
       {(question.kind === 'short' || question.kind === 'flashcard') && showAnswer && !outcome && <div className="form-actions">{(['self-met', 'self-partial', 'self-missed'] as const).map((r, i) => <button className="button button-secondary" key={r} onClick={() => submit(r)}>{['تمكنت منها', 'تذكرت جزءًا', 'لم أستطع استرجاعها'][i]}</button>)}</div>}
-      {outcome && <div className="answer-feedback" role="status" data-testid="status-answer-feedback"><b>{outcome === 'correct' ? 'إجابة صحيحة' : outcome === 'incorrect' ? 'إجابة غير صحيحة' : outcome === 'self-met' ? 'قيّمتها: تذكرتها' : outcome === 'self-partial' ? 'قيّمتها: تذكرت جزءًا' : 'قيّمتها: لم أتذكرها'}</b>{question.kind === 'mcq' && <div>{question.answer}</div>}<p>ثقتك {confidence}/5 منفصلة عن نتيجة الاسترجاع.</p><Citation ws={ws} sourceId={question.sourceId} citation={question.citation} label={`ارجع إلى ${question.location}`} /><div className="form-actions"><button className="button button-primary" onClick={next}>السؤال التالي <ArrowLeft size={14} /></button><Link href="/progress" className="button button-secondary">سجل الأثر</Link></div></div>}
+      {outcome && <div className="answer-feedback" role="status" data-testid="status-answer-feedback"><b>{outcome === 'correct' ? 'إجابة صحيحة' : outcome === 'incorrect' ? 'إجابة غير صحيحة' : outcome === 'self-met' ? 'قيّمتها: تذكرتها' : outcome === 'self-partial' ? 'قيّمتها: تذكرت جزءًا' : 'قيّمتها: لم أتذكرها'}</b>{question.kind === 'mcq' && <div>{question.answer}</div>}<p>ثقتك {confidence}/5 منفصلة عن نتيجة الاسترجاع.</p><p>موعد المراجعة التالية: بعد {plannedDelayMs === null ? '—' : reviewDelayLabel(plannedDelayMs)}؛ لا يدخل تقدير الثقة في الجدولة.</p><Citation ws={ws} sourceId={question.sourceId} citation={question.citation} label={`ارجع إلى ${question.location}`} /><div className="form-actions"><button className="button button-primary" onClick={next}>السؤال التالي <ArrowLeft size={14} /></button><Link href="/progress" className="button button-secondary">سجل الأثر</Link></div></div>}
     </section>
     <div className="section-head"><h2 className="section-title">بنك أسئلتك</h2><span className="tag">{ws.questions.length.toLocaleString('ar')}</span></div>
     <div className="list-stack">{ws.questions.map(q => <article className="card evidence-row" key={q.id}><div className="row-main"><b className="row-title">{q.prompt}</b><span className="row-meta">{q.kind} · {ws.concepts.find(c => c.id === q.conceptId)?.title} · {ws.sources.find(s => s.id === q.sourceId)?.title}</span><Citation ws={ws} sourceId={q.sourceId} citation={q.citation} label={q.location} /></div><div className="row-actions"><button className="icon-button" aria-label={`تعديل السؤال: ${q.prompt}`} onClick={() => { setEditingQuestion(q); setShowQuestionForm(true); }}><Settings size={15} /></button><button className="icon-button" aria-label={`حذف السؤال: ${q.prompt}`} onClick={() => { if (window.confirm('سيُحذف السؤال ومحاولاته المسجلة المرتبطة به. هل تريد المتابعة؟')) cascadeDelete({ type: 'question', id: q.id }); }}><Trash2 size={15} /></button></div></article>)}</div>
@@ -426,8 +459,9 @@ function ManualQuestionForm({ question, onClose }: { question?: Question | null;
 
 function ProgressPage() {
   const { ws } = useWorkspace();
+  const dueCount = dueReviewIds(ws.questions, ws.evidence).length;
   return <div className="content"><PageHeading eyebrow="LEARNING EVIDENCE" title="أثر التعلّم" description="سجلّ المحاولات مع نسخة السؤال وقتها. الثقة الذاتية منفصلة عن النتيجة." />
-    <div className="metric-grid"><Metric value={ws.evidence.length} label="محاولة مسجلة" /><Metric value={ws.evidence.filter(e => e.outcome === 'correct').length} label="إجابة اختيار صحيحة" /><Metric value={ws.evidence.filter(e => e.outcome.startsWith('self-')).length} label="تقييم ذاتي بعد الاسترجاع" /></div>
+    <div className="metric-grid"><Metric value={ws.evidence.length} label="محاولة مسجلة" /><Metric value={ws.evidence.filter(e => e.outcome === 'correct').length} label="إجابة اختيار صحيحة" /><Metric value={ws.evidence.filter(e => e.outcome.startsWith('self-')).length} label="تقييم ذاتي بعد الاسترجاع" /><Metric value={dueCount} label="سؤال جديد أو مستحق" /></div>
     {ws.evidence.length ? <div className="list-stack">{[...ws.evidence].reverse().map(e => <article className="card evidence-row" key={e.id} data-testid={`card-evidence-${e.id}`}><div className="row-icon"><Brain size={17} /></div><div className="row-main"><div className="row-title">{e.snapshot.prompt}</div><div className="row-meta"><span>{e.snapshot.conceptTitle || 'مفهوم غير موجود'}</span><span>{e.snapshot.sourceTitle}</span><span>{new Date(e.createdAt).toLocaleString('ar')}</span></div><div className="answer-feedback" style={{ marginTop: 8 }}>{e.outcome === 'correct' ? 'صحيحة' : e.outcome === 'incorrect' ? 'غير صحيحة' : e.outcome === 'self-met' ? 'استرجاع ذاتي: كامل' : e.outcome === 'self-partial' ? 'استرجاع ذاتي: جزئي' : 'استرجاع ذاتي: لم أتمكن'} · الثقة {e.confidence}/5 · بلا مساعدة</div><Citation ws={ws} sourceId={e.sourceId} citation={e.snapshot.citation} label={e.snapshot.location} /></div></article>)}</div> : <Empty title="لا توجد محاولات مسجلة" copy="ابدأ جلسة استرجاع مستقلة لتسجيل أول دليل." icon={ChartNoAxesColumnIncreasing} action={<Link href="/study" className="button button-primary">ابدأ الاسترجاع</Link>} />}
   </div>;
 }
@@ -458,6 +492,7 @@ function SettingsPage({ dark, toggleTheme }: { dark: boolean; toggleTheme: () =>
     <section className="card setting-section"><h2 className="setting-title">أنماط الجلسة</h2><p className="setting-copy">تحدد الحد الأعلى لعدد الأسئلة في جلسة الاسترجاع.</p>{ws.modes.map(m => <div className="mode-item" key={m.id}><span><b>{m.name}</b><span className="setting-copy" style={{ margin: '0 8px' }}>{m.questionCount} أسئلة · بلا تلميحات</span></span><div className="row-actions"><button className="icon-button" aria-label={`تعديل نمط ${m.name}`} onClick={() => { setEditingMode(m.id); setModeName(m.name); setModeCount(m.questionCount); }}><Settings size={15} /></button><button className="icon-button" aria-label={`حذف نمط ${m.name}`} onClick={() => { if (window.confirm(`حذف نمط «${m.name}»؟`)) update(w => ({ ...w, modes: w.modes.filter(x => x.id !== m.id) })); }}><Trash2 size={15} /></button></div></div>)}
       <form className="form-grid" style={{ marginTop: 14 }} onSubmit={saveMode}><div className="field"><label htmlFor="mode-name">اسم النمط</label><input id="mode-name" required value={modeName} onChange={e => setModeName(e.target.value)} placeholder="مثل: مراجعة قصيرة" /></div><div className="field"><label htmlFor="mode-count">عدد الأسئلة</label><select id="mode-count" value={modeCount} onChange={e => setModeCount(Number(e.target.value))}><option value={3}>٣ أسئلة</option><option value={5}>٥ أسئلة</option><option value={8}>٨ أسئلة</option></select></div><div className="form-actions"><button className="button button-secondary"><Plus size={14} />{editingMode ? 'حفظ النمط' : 'أضف نمطًا'}</button>{editingMode && <button type="button" className="button button-quiet" onClick={() => { setEditingMode(null); setModeName(''); }}>إلغاء</button>}</div></form>
     </section>
+    <section className="card setting-section"><h2 className="setting-title">المراجعة المتباعدة (اختيارية)</h2><p className="setting-copy">من زر «المستحق» في جلسة الاسترجاع أو بطاقة الصفحة الرئيسية يمكنك عرض الأسئلة الجديدة والمستحقة فقط. الموعد يعتمد على الإجابة: إجابة صحيحة أو استرجاع كامل يقدمان البطاقة بين يوم و٣٠ يومًا (١، ٣، ٧، ١٤، ٣٠)، الإجابة الجزئية بعد ١٢ ساعة، والخاطئة أو غير المتذكّرة بعد ١٠ دقائق. إعادة التذكر غير الناجحة تعيد المسار إلى بدايته. لا تُستخدم الثقة في الحساب.</p><p className="setting-copy">هذه فواصل بسيطة وشفافة وليست نموذج FSRS أو تنبؤًا علميًا بالإتقان. لا تُعدّ المواعيد إثباتًا للتعلم؛ تعتمد النتيجة على سجل المحاولات المحلية ويمكن تجاوز المراجعة أو تركها. للمقارنة، <a href="https://docs.ankiweb.net/deck-options.html" target="_blank" rel="noreferrer">توثيق Anki لخيارات FSRS</a>.</p></section>
     <section className="card setting-section"><h2 className="setting-title">الوضع الليلي</h2><p className="setting-copy">تغيير بصري يُحفظ محليًا على هذا الجهاز.</p><button className="button button-secondary" onClick={toggleTheme}>{dark ? <Sun size={15} /> : <Moon size={15} />}{dark ? 'استخدم الفاتح' : 'استخدم الداكن'}</button></section>
     <section className="card setting-section"><h2 className="setting-title">إعادة ضبط المحتوى</h2><p className="setting-copy">يمسح كل البيانات والملفات المحلية ثم ينشئ مساحة فارغة. لا يمكن التراجع دون نسخة احتياطية.</p>{resetError && <div className="notice notice-danger">{resetError}</div>}<button className="button button-danger" onClick={reset} data-testid="button-reset-data"><Trash2 size={15} /> احذف المحتوى المحلي</button></section>
   </div>;
