@@ -202,7 +202,7 @@ function SourceReader() {
           <div className="field"><label htmlFor="ocr-text">راجع النص المستخرج أو اكتبه يدويًا</label><textarea id="ocr-text" value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="قارن كل سطر بصورة الصفحة قبل إضافته…" /></div>
           <button className="button button-primary" disabled={!ocrText.trim()} onClick={appendOcr}>أضف النص بعد المراجعة</button>
         </div>}
-      </></>}
+      </>}
     </section>}
     {source.kind === 'youtube' && <section className="card setting-section"><h2 className="setting-title">تفريغ الفيديو</h2><p className="setting-copy">التفريغ المرفق يدويًا أو المستورد من SRT/VTT محفوظ محليًا. لا يوجد استيراد تلقائي للتحويل الكلامي من YouTube في هذا الإصدار.</p><a className="button button-secondary" href={`https://www.youtube.com/watch?v=${source.videoId}`} target="_blank" rel="noreferrer">افتح الفيديو على YouTube <ArrowDownLeft size={14} /></a></section>}
     {source.kind !== 'pdf' && <section className="card setting-section"><h2 className="setting-title">مقاطع المصدر</h2>{segments.length ? <div className="segment-list">{segments.map(s => <button className={`card segment-row ${active === s.id ? 'is-active' : ''}`} key={s.id} onClick={() => goToSegment(s)}><span>{s.text}</span><span className="tag">{locationLabel(s)}{s.startSeconds !== undefined ? ` · ${formatTime(s.startSeconds)}` : ''}</span></button>)}</div> : <Empty title="لا يوجد نص مستخرج" copy="تحقق من أن المصدر يحتوي على محتوى نصي." />}</section>}
