@@ -9,7 +9,7 @@ import { LIMITS, type Segment, type Source, type SourceKind } from '@/lib/types'
 import { apiErrorMessage, chunkText, formatBytes, formatTime, isAbort, nowIso, parsePageRange, sha256, uid } from '@/lib/util';
 import { putFile } from '@/lib/db';
 import { detectKind, readTextFile, readDocx, checkTextLimit } from '@/lib/ingest/text';
-import { openPdf, extractPages, pageSegments, type PdfDoc } from '@/lib/ingest/pdf';
+import { openPdf, extractPages, pageSegments, destroyPdf, type PdfDoc } from '@/lib/ingest/pdf';
 import { parseYouTubeId } from '@/lib/ingest/youtube';
 import { parseSubtitles, parseManual, groupCues, type Cue } from '@/lib/ingest/transcript';
 
@@ -67,7 +67,7 @@ function FileTab({ onClose }: { onClose: () => void }) {
   const abort = useRef<AbortController | null>(null);
   const sourceId = useRef(uid());
 
-  useEffect(() => () => { abort.current?.abort(); void pdf?.doc.destroy(); }, [pdf]);
+  useEffect(() => () => { abort.current?.abort(); if (pdf) void destroyPdf(pdf.doc); }, [pdf]);
 
   const choose = async (f: File | undefined) => {
     setError(''); setDup(null); setPdf(null); setFile(null); setPhase('idle');

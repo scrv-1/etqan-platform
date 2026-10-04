@@ -7,18 +7,28 @@ import { chunkText } from '../util';
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 export type PdfDoc = PDFDocumentProxy;
+type PdfLoadingTask = ReturnType<typeof pdfjs.getDocument>;
+const loadingTasks = new WeakMap<PdfDoc, PdfLoadingTask>();
+
+export async function destroyPdf(doc: PdfDoc) {
+  const task = loadingTasks.get(doc);
+  loadingTasks.delete(doc);
+  if (task && !task.destroyed) await task.destroy();
+}
 
 export async function openPdf(data: ArrayBuffer): Promise<{ doc: PdfDoc; labels: string[] | null }> {
   // pdf.js transfers the buffer to its worker; pass a copy so callers keep theirs.
-  const task = pdfjs.getDocument({ data: new Uint8Array(data.slice(0)), isEvalSupported: false });
+  const task = pdfjs.getDocument({ data: new Uint8Array(data.slice(0)) });
   let doc: PdfDoc;
   try { doc = await task.promise; }
   catch (err) {
+    void task.destroy();
     const name = (err as { name?: string })?.name;
     if (name === 'PasswordException') throw new Error('الملف محمي بكلمة مرور؛ لا يمكن قراءته.');
     throw new Error('تعذر فتح ملف PDF؛ قد يكون تالفًا أو ليس PDF.');
   }
-  if (doc.numPages > LIMITS.pdfMaxPages) { await doc.destroy(); throw new Error(`الملف يحتوي ${doc.numPages} صفحة، والحد المسموح ${LIMITS.pdfMaxPages}.`); }
+  loadingTasks.set(doc, task);
+  if (doc.numPages > LIMITS.pdfMaxPages) { await destroyPdf(doc); throw new Error(`الملف يحتوي ${doc.numPages} صفحة، والحد المسموح ${LIMITS.pdfMaxPages}.`); }
   let labels: string[] | null = null;
   try { labels = await doc.getPageLabels(); } catch { labels = null; }
   return { doc, labels };

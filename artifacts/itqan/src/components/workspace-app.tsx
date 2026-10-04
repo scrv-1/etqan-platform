@@ -12,7 +12,7 @@ import { BootGate } from './boot-gate';
 import { AddSourceDialog } from './add-source-dialog';
 import { AnalysisPanel } from './analysis-panel';
 import { BackupPanel } from './backup-panel';
-import { Empty, PageHeading, SampleNote, SourceCitation, locationLabel } from './common';
+import { Empty, PageHeading, SampleNote, locationLabel } from './common';
 import { PdfCanvas, usePdfDoc } from './pdf-viewer';
 import { useWorkspace, WorkspaceProvider } from '@/state/workspace';
 import { useCapabilities } from '@/state/capabilities';

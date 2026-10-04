@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, ChevronLeft, ZoomIn, ZoomOut, LoaderCircle, CircleAlert } from 'lucide-react';
 import { getFile } from '@/lib/db';
-import { openPdf, renderPage, type PdfDoc } from '@/lib/ingest/pdf';
+import { openPdf, renderPage, destroyPdf, type PdfDoc } from '@/lib/ingest/pdf';
 
 export function usePdfDoc(fileId: string | undefined) {
   const [state, setState] = useState<{ doc: PdfDoc | null; labels: string[] | null; error: string; loading: boolean }>({ doc: null, labels: null, error: '', loading: !!fileId });
@@ -15,10 +15,10 @@ export function usePdfDoc(fileId: string | undefined) {
         if (!f) throw new Error('الملف الأصلي غير موجود في تخزين هذا الجهاز. استعد نسخة احتياطية تتضمنه.');
         const { doc, labels } = await openPdf(await f.blob.arrayBuffer());
         opened = doc;
-        if (alive) setState({ doc, labels, error: '', loading: false }); else void doc.destroy();
+        if (alive) setState({ doc, labels, error: '', loading: false }); else void destroyPdf(doc);
       } catch (e) { if (alive) setState({ doc: null, labels: null, error: e instanceof Error ? e.message : 'تعذر فتح الملف', loading: false }); }
     })();
-    return () => { alive = false; void opened?.destroy(); };
+    return () => { alive = false; if (opened) void destroyPdf(opened); };
   }, [fileId]);
   return state;
 }
