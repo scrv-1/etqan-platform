@@ -34,7 +34,7 @@ function useSaveSource(onClose: () => void) {
   const { update, flash } = useWorkspace();
   const [, go] = useLocation();
   return (source: Source, segments: Segment[]) => {
-    update(w => ({ ...w, sample: w.sample, sources: [source, ...w.sources.filter(s => s.id !== source.id)], segments: [...w.segments.filter(s => s.sourceId !== source.id), ...segments] }));
+    update(w => ({ ...w, sample: false, sources: [source, ...w.sources.filter(s => s.id !== source.id)], segments: [...w.segments.filter(s => s.sourceId !== source.id), ...segments] }));
     flash(`أُضيف «${source.title}»`);
     onClose();
     go(`/sources/${source.id}`);

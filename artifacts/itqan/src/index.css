@@ -464,3 +464,32 @@
 .source-reference blockquote{margin:10px 0 0;padding:0 12px 0 0;border-right:2px solid hsl(var(--accent));color:hsl(var(--muted-foreground));font-size:12px;line-height:1.9;white-space:pre-wrap}
 .toast-message{position:fixed;z-index:30;bottom:82px;left:24px;padding:12px 16px;background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-radius:10px;box-shadow:0 8px 28px hsl(var(--foreground)/.13);display:flex;align-items:center;gap:8px;font-size:12px}
 @media(min-width:681px){.toast-message{bottom:24px}}
+.graph-canvas{min-height:360px;padding:12px}
+.graph-canvas svg{display:block;width:100%;height:auto;min-height:340px;position:relative;z-index:1;overflow:visible}
+.graph-edge line{stroke:hsl(var(--accent));stroke-width:2}
+.graph-edge rect{fill:hsl(var(--card));stroke:hsl(var(--border));stroke-width:1}
+.graph-edge text{font-size:11px;fill:hsl(var(--muted-foreground));direction:rtl}
+.graph-node{cursor:pointer;outline:none}
+.graph-node circle{fill:hsl(var(--card));stroke:hsl(var(--primary));stroke-width:2;transition:fill .15s,stroke-width .15s}
+.graph-node:hover circle,.graph-node:focus circle,.graph-node.selected circle{fill:hsl(var(--primary));stroke-width:3}
+.graph-node text{font-size:13px;font-weight:600;fill:hsl(var(--foreground));pointer-events:none}
+.graph-node:hover text,.graph-node:focus text,.graph-node.selected text{fill:hsl(var(--primary-foreground))}
+.graph-node text.graph-node-meta{font-size:9px;font-weight:400;opacity:.75}
+.map-toolbar{display:grid;grid-template-columns:minmax(110px,180px) minmax(180px,1fr);gap:10px;align-items:center;margin-bottom:14px;font-size:12px}
+.graph-list-button{display:grid;gap:5px;border:0;background:transparent;color:inherit;text-align:right;cursor:pointer;padding:0}
+.selected-concept{position:relative}
+.segment-list{display:grid;gap:9px}
+.segment-row{display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:13px 15px;color:hsl(var(--foreground));line-height:1.8;text-align:right;cursor:pointer}
+.segment-row:hover,.segment-row.is-active{border-color:hsl(var(--primary));background:hsl(var(--primary)/.06)}
+.segment-row .tag{white-space:normal;text-align:right}
+.suggestion-card{padding:16px;margin-bottom:10px}
+.suggestion-card .row-title{display:block;margin:10px 0}
+.evidence-row{padding:16px}
+.source-row .row-title{font-weight:600}
+.source-row a.row-title{color:inherit;text-decoration:none}
+.source-row a.row-title:hover{text-decoration:underline;text-underline-offset:3px}
+.form-card{padding:18px;margin:12px 0}
+.setting-section .check-row{margin:12px 0}
+.preview-quote{margin:9px 0;padding:9px 12px;border-inline-start:2px solid hsl(var(--accent));background:hsl(var(--muted)/.45);border-radius:6px;font-size:12px;line-height:1.8;white-space:pre-wrap}
+.field-error{color:hsl(var(--destructive));font-size:12px}
+@media(max-width:680px){.graph-canvas{min-height:280px;padding:6px}.graph-canvas svg{min-height:270px}.map-toolbar{grid-template-columns:1fr}.graph-node circle{r:39px}.graph-node text{font-size:11px}.graph-node text.graph-node-meta{font-size:8px}.segment-row{padding:11px}.suggestion-card{padding:12px}}

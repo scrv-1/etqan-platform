@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link, Route, Switch, useLocation, useParams } from 'wouter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -20,7 +20,7 @@ import { extractPageText } from '@workspace/api-client-react';
 import { pageImageDataUrl } from '@/lib/ingest/pdf';
 import { describeImpact, impactOf } from '@/lib/cascade';
 import { formatTime, nowIso, uid } from '@/lib/util';
-import type { Citation, Concept, Evidence, Question, Relation, Segment, Source, Workspace } from '@/lib/types';
+import type { Citation, Concept, Evidence, Question, QuestionKind, Relation, Segment, Source, StudyMode, Workspace } from '@/lib/types';
 
 const queryClient = new QueryClient();
 
@@ -47,6 +47,7 @@ function Runtime() {
   const [dark, setDark] = useState(() => {
     try { return localStorage.getItem('itqan-theme') === 'dark'; } catch { return false; }
   });
+  useEffect(() => { document.documentElement.classList.toggle('dark', dark); }, [dark]);
   const toggleTheme = () => setDark(d => {
     const next = !d;
     document.documentElement.classList.toggle('dark', next);
@@ -63,7 +64,7 @@ function Runtime() {
       <Route path="/knowledge" component={KnowledgePage} />
       <Route path="/study" component={StudyPage} />
       <Route path="/progress" component={ProgressPage} />
-      <Route path="/settings" component={SettingsPage} />
+      <Route path="/settings"><SettingsPage dark={dark} toggleTheme={toggleTheme} /></Route>
       <Route><div className="content"><Empty title="هذه الصفحة غير موجودة" copy="ارجع إلى مساحة اليوم للمتابعة." action={<Link className="button button-secondary" href="/">مساحة اليوم</Link>} /></div></Route>
     </Switch>
   </AppShell>;
@@ -147,7 +148,7 @@ function SourceReader() {
   const querySeg = new URLSearchParams(window.location.search).get('seg');
   const [selected, setSelected] = useState<Set<string>>(new Set(querySeg ? [querySeg] : []));
   const [active, setActive] = useState(querySeg ?? '');
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => ws.segments.find(s => s.id === querySeg)?.page ?? 1);
   const [ocrConsent, setOcrConsent] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [ocrText, setOcrText] = useState('');
@@ -157,6 +158,7 @@ function SourceReader() {
   const { doc, labels, loading: pdfLoading, error: pdfError } = usePdfDoc(source?.fileId);
   const selectedSegment = segments.find(s => s.id === active);
   const pageSegments = segments.filter(s => s.page === page);
+  useEffect(() => { setOcrConsent(false); setOcrText(''); setOcrWarnings([]); setOcrError(''); }, [page]);
 
   if (!source) return <div className="content"><Empty title="المصدر غير موجود" copy="قد يكون حُذف أو لم يُستعد من النسخة الاحتياطية." action={<Link href="/sources" className="button button-secondary">عودة إلى المصادر</Link>} /></div>;
 
