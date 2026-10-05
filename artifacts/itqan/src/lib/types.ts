@@ -79,6 +79,7 @@ export type Question = {
   location: string;
   origin: Origin;
   updatedAt: string;
+  importKey?: string;
 };
 
 export type EvidenceSnapshot = {
