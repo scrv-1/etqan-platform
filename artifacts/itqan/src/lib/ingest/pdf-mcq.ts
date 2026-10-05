@@ -27,6 +27,7 @@ export type PdfMcqExtraction = {
 };
 
 type TextPart = { x: number; width: number; text: string; hasEOL: boolean };
+type PositionedTextPart = TextPart & { y: number };
 
 function questionHeader(text: string) {
   const normalized = text.replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit))).trim();
@@ -49,7 +50,7 @@ function joinParts(parts: TextPart[]) {
   return text.trim();
 }
 
-function makeLines(page: number, parts: TextPart[]): PdfMcqLine[] {
+function makeLines(page: number, parts: PositionedTextPart[]): PdfMcqLine[] {
   const sorted = [...parts].sort((a, b) => b.y - a.y || a.x - b.x);
   const groups: { y: number; parts: TextPart[] }[] = [];
   for (const part of sorted) {

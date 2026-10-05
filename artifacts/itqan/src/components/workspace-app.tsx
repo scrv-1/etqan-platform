@@ -218,7 +218,7 @@ function SourceReader() {
     ? ''
     : typeof parsedMcqPages === 'string'
       ? parsedMcqPages
-      : parsedMcqPages.length > LIMITS.pdfPagesPerExtraction
+      : Array.isArray(parsedMcqPages) && parsedMcqPages.length > LIMITS.pdfPagesPerExtraction
         ? `الحد ${LIMITS.pdfPagesPerExtraction} صفحة في كل فحص.`
         : '';
 
