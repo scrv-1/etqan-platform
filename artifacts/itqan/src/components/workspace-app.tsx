@@ -12,17 +12,19 @@ import { BootGate } from './boot-gate';
 import { AddSourceDialog } from './add-source-dialog';
 import { AnalysisPanel } from './analysis-panel';
 import { BackupPanel } from './backup-panel';
-import { Empty, PageHeading, SampleNote, locationLabel } from './common';
+import { Empty, PageHeading, ProgressBar, SampleNote, locationLabel } from './common';
+import { PdfMcqReview } from './pdf-mcq-review';
 import { PdfCanvas, usePdfDoc } from './pdf-viewer';
 import { PdfMorePages } from './pdf-more-pages';
 import { useWorkspace, WorkspaceProvider } from '@/state/workspace';
 import { useCapabilities } from '@/state/capabilities';
 import { extractPageText } from '@workspace/api-client-react';
 import { pageImageDataUrl } from '@/lib/ingest/pdf';
+import { extractPdfMcqs, type PdfMcqCandidate } from '@/lib/ingest/pdf-mcq';
 import { describeImpact, impactOf } from '@/lib/cascade';
-import { formatTime, nowIso, uid } from '@/lib/util';
+import { formatTime, normalizeText, nowIso, parsePageRange, uid } from '@/lib/util';
 import { getReviewPlan } from '@/lib/review';
-import type { Citation, Concept, Evidence, Question, QuestionKind, Relation, Segment, Source, StudyMode, Workspace } from '@/lib/types';
+import { LIMITS, type Citation, type Concept, type Evidence, type Question, type QuestionKind, type Relation, type Segment, type Source, type StudyMode, type Workspace } from '@/lib/types';
 
 const queryClient = new QueryClient();
 
@@ -181,9 +183,146 @@ function SourceReader() {
   const [ocrError, setOcrError] = useState('');
   const { caps } = useCapabilities();
   const { doc, labels, loading: pdfLoading, error: pdfError } = usePdfDoc(source?.fileId);
+  const [mcqRange, setMcqRange] = useState('');
+  const [mcqBusy, setMcqBusy] = useState(false);
+  const [mcqProgress, setMcqProgress] = useState(0);
+  const [mcqError, setMcqError] = useState('');
+  const [mcqNotice, setMcqNotice] = useState('');
+  const [mcqCandidates, setMcqCandidates] = useState<PdfMcqCandidate[]>([]);
+  const [mcqPagesWithoutText, setMcqPagesWithoutText] = useState<number[]>([]);
+  const [mcqReviewOpen, setMcqReviewOpen] = useState(false);
+  const mcqAbort = useRef<AbortController | null>(null);
   const selectedSegment = segments.find(s => s.id === active);
   const pageSegments = segments.filter(s => s.page === page);
   useEffect(() => { setOcrConsent(false); setOcrText(''); setOcrWarnings([]); setOcrError(''); }, [page]);
+  useEffect(() => {
+    if (doc) setMcqRange(`1-${Math.min(doc.numPages, LIMITS.pdfPagesPerExtraction)}`);
+  }, [doc]);
+  useEffect(() => {
+    setMcqCandidates([]);
+    setMcqPagesWithoutText([]);
+    setMcqReviewOpen(false);
+    setMcqError('');
+    setMcqNotice('');
+  }, [sourceId]);
+  useEffect(() => () => mcqAbort.current?.abort(), []);
+
+  const parsedMcqPages = doc ? parsePageRange(mcqRange, doc.numPages) : null;
+  const mcqRangeError = !doc
+    ? ''
+    : typeof parsedMcqPages === 'string'
+      ? parsedMcqPages
+      : parsedMcqPages.length > LIMITS.pdfPagesPerExtraction
+        ? `الحد ${LIMITS.pdfPagesPerExtraction} صفحة في كل فحص.`
+        : '';
+
+  const runPdfMcqExtraction = async () => {
+    if (!doc || !source || source.kind !== 'pdf') return;
+    if (!Array.isArray(parsedMcqPages) || mcqRangeError) {
+      setMcqError(mcqRangeError || 'أدخل نطاق صفحات صالحًا.');
+      return;
+    }
+    mcqAbort.current?.abort();
+    const controller = new AbortController();
+    mcqAbort.current = controller;
+    setMcqBusy(true);
+    setMcqProgress(0);
+    setMcqError('');
+    setMcqNotice('');
+    setMcqCandidates([]);
+    setMcqPagesWithoutText([]);
+    setMcqReviewOpen(false);
+    try {
+      const result = await extractPdfMcqs(doc, parsedMcqPages, segments, (done, total) => {
+        setMcqProgress(done / Math.max(total, 1));
+      }, controller.signal);
+      if (controller.signal.aborted) return;
+      setMcqCandidates(result.questions);
+      setMcqPagesWithoutText(result.pagesWithoutText);
+      setMcqNotice(result.questions.length
+        ? `عُثر على ${result.questions.length.toLocaleString('ar')} سؤال مرشح. راجع كل سؤال وحدّد إجابته قبل الحفظ.`
+        : 'لم يُعثر على أسئلة اختيار من متعدد في الصفحات المحددة.');
+      setMcqReviewOpen(result.questions.length > 0);
+    } catch (error) {
+      if (!controller.signal.aborted) setMcqError(error instanceof Error ? error.message : 'تعذر فحص صفحات PDF محليًا.');
+    } finally {
+      if (!controller.signal.aborted) setMcqBusy(false);
+      if (mcqAbort.current === controller) mcqAbort.current = null;
+    }
+  };
+
+  const saveImportedQuestion = (value: {
+    candidate: PdfMcqCandidate;
+    prompt: string;
+    choices: string[];
+    correctChoice: number;
+    conceptId: string;
+    segmentId: string;
+    newConceptTitle: string;
+  }) => {
+    if (!source || source.kind !== 'pdf') return;
+    const { candidate, prompt, choices, correctChoice, conceptId, segmentId, newConceptTitle } = value;
+    const importedSegmentId = `${source.id}:pdf-import:${candidate.importKey}`;
+    const printedPage = labels?.[candidate.page - 1];
+    const fallbackSegment: Segment = {
+      id: importedSegmentId,
+      sourceId: source.id,
+      order: segments.reduce((max, segment) => Math.max(max, segment.order), -1) + 1,
+      text: `السؤال ${candidate.questionNumber}\n${prompt}\n${choices.map((choice, index) => `${index + 1}. ${choice}`).join('\n')}`,
+      page: candidate.page,
+      printedPage: printedPage && printedPage !== String(candidate.page) ? printedPage : undefined,
+      origin: 'pdf-text',
+    };
+    const createdAt = nowIso();
+    const createdConceptId = uid();
+    const questionId = uid();
+    update(w => {
+      if (w.questions.some(question => question.sourceId === source.id && question.importKey === candidate.importKey)) return w;
+      const segment = (segmentId ? w.segments.find(item => item.id === segmentId && item.sourceId === source.id) : undefined)
+        ?? w.segments.find(item => item.id === importedSegmentId)
+        ?? { ...fallbackSegment, order: w.segments.reduce((max, item) => Math.max(max, item.order), -1) + 1 };
+      const existingConcept = (conceptId ? w.concepts.find(item => item.id === conceptId && item.sourceId === source.id) : undefined)
+        ?? (newConceptTitle.trim()
+          ? w.concepts.find(item => item.sourceId === source.id && normalizeText(item.title) === normalizeText(newConceptTitle))
+          : undefined);
+      const concept = existingConcept ?? {
+        id: createdConceptId,
+        title: newConceptTitle.trim(),
+        description: '',
+        sourceId: source.id,
+        kind: 'concept' as const,
+        citation: { segmentId: segment.id },
+        location: locationLabel(segment),
+        status: 'قيد المراجعة',
+        origin: 'manual' as const,
+        createdAt,
+      };
+      const question: Question = {
+        id: questionId,
+        kind: 'mcq',
+        prompt,
+        choices,
+        correctChoice,
+        answer: choices[correctChoice],
+        rubric: '',
+        conceptId: concept.id,
+        sourceId: source.id,
+        citation: { segmentId: segment.id },
+        location: locationLabel(segment),
+        origin: 'manual',
+        updatedAt: createdAt,
+        importKey: candidate.importKey,
+      };
+      return {
+        ...w,
+        sample: false,
+        segments: w.segments.some(item => item.id === segment.id) ? w.segments : [...w.segments, segment],
+        concepts: existingConcept ? w.concepts : [...w.concepts, concept],
+        questions: [...w.questions, question],
+      };
+    });
+    flash('حُفظ السؤال محليًا بعد مراجعة إجابته وربطه بالمفهوم والمصدر.');
+  };
 
   if (!source) return <div className="content"><Empty title="المصدر غير موجود" copy="قد يكون حُذف أو لم يُستعد من النسخة الاحتياطية." action={<Link href="/sources" className="button button-secondary">عودة إلى المصادر</Link>} /></div>;
 

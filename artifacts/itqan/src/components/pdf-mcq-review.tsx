@@ -39,7 +39,7 @@ function makeDraft(candidate: PdfMcqCandidate, segments: PdfMcqReviewProps['segm
     newConceptTitle: suggestedTopic ?? '',
     segmentId: segments.some(segment => segment.id === candidate.segmentId)
       ? candidate.segmentId!
-      : segments[0]?.id ?? '',
+      : segments.find(segment => segment.page === candidate.page)?.id ?? '',
   };
 }
 
@@ -73,7 +73,7 @@ export function PdfMcqReview({
     && draft.choices.every(choice => !!choice.trim())
     && draft.correctChoice !== null
     && hasConcept
-    && !!draft.segmentId
+    && (!!draft.segmentId || candidate.page > 0)
     && !duplicate
     && !alreadySaved;
 
@@ -276,7 +276,7 @@ export function PdfMcqReview({
                       </option>
                     ))}
                   </select>
-                  {segments.length === 0 && <span className="pdf-mcq-review__hint" data-testid={`hint-no-source-segments-${candidate.importKey}`}>لا توجد مقاطع مصدر متاحة للربط.</span>}
+                  {!draft!.segmentId && <span className="pdf-mcq-review__hint" data-testid={`hint-no-source-segments-${candidate.importKey}`}>ستُربط الإحالة بصفحة PDF {candidate.page}، ويُنشأ مقطع محلي من السؤال عند الحفظ.</span>}
                 </div>
               </div>
             </div>
