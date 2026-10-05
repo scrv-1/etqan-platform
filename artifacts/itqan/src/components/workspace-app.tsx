@@ -229,7 +229,6 @@ function SourceReader() {
     setMcqProgress(0);
     setMcqError('');
     setMcqNotice('');
-    setMcqCandidates([]);
     setMcqPagesWithoutText([]);
     setMcqReviewOpen(false);
     try {
@@ -237,12 +236,16 @@ function SourceReader() {
         setMcqProgress(done / Math.max(total, 1));
       }, controller.signal);
       if (controller.signal.aborted) return;
-      setMcqCandidates(result.questions);
+      setMcqCandidates(previous => {
+        const byKey = new Map(previous.map(candidate => [candidate.importKey, candidate]));
+        result.questions.forEach(candidate => byKey.set(candidate.importKey, candidate));
+        return [...byKey.values()].sort((a, b) => a.page - b.page || Number(a.questionNumber) - Number(b.questionNumber));
+      });
       setMcqPagesWithoutText(result.pagesWithoutText);
       setMcqNotice(result.questions.length
-        ? `عُثر على ${result.questions.length.toLocaleString('ar')} سؤال مرشح. راجع كل سؤال وحدّد إجابته قبل الحفظ.`
+        ? `عُثر على ${result.questions.length.toLocaleString('ar')} سؤال مرشح في هذا الفحص. راجع كل سؤال وحدّد إجابته قبل الحفظ.`
         : 'لم يُعثر على أسئلة اختيار من متعدد في الصفحات المحددة.');
-      setMcqReviewOpen(result.questions.length > 0);
+      if (result.questions.length > 0) setMcqReviewOpen(true);
     } catch (error) {
       if (!controller.signal.aborted) setMcqError(error instanceof Error ? error.message : 'تعذر فحص صفحات PDF محليًا.');
     } finally {
@@ -374,13 +377,44 @@ function SourceReader() {
           <div className="field"><label htmlFor="ocr-text">راجع النص المستخرج أو اكتبه يدويًا</label><textarea id="ocr-text" value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="قارن كل سطر بصورة الصفحة قبل إضافته…" /></div>
           <button className="button button-primary" disabled={!ocrText.trim()} onClick={appendOcr}>أضف النص بعد المراجعة</button>
          </div>}
-       </div><PdfMorePages source={source} doc={doc} labels={labels} /></>}
+        </div><PdfMorePages source={source} doc={doc} labels={labels} />
+        <section className="setting-section" style={{ padding: 0, marginTop: 18 }} data-testid="panel-pdf-question-import">
+          <h3 className="setting-title">استيراد الأسئلة الموجودة في PDF</h3>
+          <p className="setting-copy">يفحص طبقة النص محليًا على جهازك، دون إرسال الملف أو استخدام التحليل الذكي. ستراجع كل سؤال وتحدد إجابته قبل الحفظ.</p>
+          <div className="form-grid">
+            <div className="field full">
+              <label htmlFor="pdf-mcq-page-range">صفحات الفحص</label>
+              <input id="pdf-mcq-page-range" dir="ltr" value={mcqRange} onChange={event => setMcqRange(event.target.value)} placeholder="1-10, 14" aria-describedby="pdf-mcq-page-help" data-testid="input-pdf-mcq-page-range" />
+              <span id="pdf-mcq-page-help" className="setting-copy" style={{ margin: 0 }}>أدخل نطاقًا لا يتجاوز {LIMITS.pdfPagesPerExtraction} صفحة في كل مرة.</span>
+            </div>
+          </div>
+          {mcqRangeError && <div className="field-error" role="alert" data-testid="status-pdf-mcq-range-error">{mcqRangeError}</div>}
+          <div className="form-actions">
+            <button type="button" className="button button-primary" onClick={runPdfMcqExtraction} disabled={mcqBusy || !doc || !!mcqRangeError} data-testid="button-scan-pdf-questions"><FileText size={15} /> افحص الأسئلة الموجودة محليًا</button>
+            {mcqBusy && <button type="button" className="button button-secondary" onClick={() => { mcqAbort.current?.abort(); mcqAbort.current = null; setMcqBusy(false); setMcqNotice('أُلغي فحص الصفحات.'); }} data-testid="button-cancel-pdf-mcq-scan">إلغاء الفحص</button>}
+            {mcqCandidates.length > 0 && !mcqReviewOpen && <button type="button" className="button button-secondary" onClick={() => setMcqReviewOpen(true)} data-testid="button-resume-pdf-mcq-review">استكمل مراجعة {mcqCandidates.length.toLocaleString('ar')} مرشحًا</button>}
+          </div>
+          {mcqBusy && <div style={{ marginTop: 12 }}><ProgressBar value={mcqProgress} label="تقدم فحص الأسئلة محليًا" /><p className="proc-line">أفحص الصفحات على هذا الجهاز… {Math.round(mcqProgress * 100).toLocaleString('ar')}٪</p></div>}
+          {mcqError && <div className="notice notice-danger" role="alert" data-testid="status-pdf-mcq-error">{mcqError}</div>}
+          {mcqNotice && <div className="notice" role="status" data-testid="status-pdf-mcq-scan">{mcqNotice}</div>}
+          {mcqPagesWithoutText.length > 0 && <div className="notice notice-warn" role="status" data-testid="status-pdf-mcq-scanned-pages">لا تحتوي الصفحات {mcqPagesWithoutText.join('، ')} على طبقة نصية قابلة للاستخراج. استُخدم فقط أي نص OCR تمت مراجعته مسبقًا.</div>}
+        </section></>}
     </section>}
     {source.kind === 'youtube' && <section className="card setting-section"><h2 className="setting-title">تفريغ الفيديو</h2><p className="setting-copy">التفريغ المرفق يدويًا أو المستورد من SRT/VTT محفوظ محليًا. لا يوجد استيراد تلقائي للتحويل الكلامي من YouTube في هذا الإصدار.</p><a className="button button-secondary" href={`https://www.youtube.com/watch?v=${source.videoId}`} target="_blank" rel="noreferrer">افتح الفيديو على YouTube <ArrowDownLeft size={14} /></a></section>}
     {source.kind !== 'pdf' && <section className="card setting-section"><h2 className="setting-title">مقاطع المصدر</h2>{segments.length ? <div className="segment-list">{segments.map(s => <button className={`card segment-row ${active === s.id ? 'is-active' : ''}`} key={s.id} onClick={() => goToSegment(s)}><span>{s.text}</span><span className="tag">{locationLabel(s)}{s.startSeconds !== undefined ? ` · ${formatTime(s.startSeconds)}` : ''}</span></button>)}</div> : <Empty title="لا يوجد نص مستخرج" copy="تحقق من أن المصدر يحتوي على محتوى نصي." />}</section>}
     {selectedSegment && <div className="notice" data-testid="panel-active-citation"><b>الإحالة المحددة · {locationLabel(selectedSegment)}</b><blockquote className="preview-quote" dir="auto">{selectedSegment.text}</blockquote></div>}
      {segments.length > 0 && <section className="card setting-section" style={{ marginTop: 16 }}><h2 className="setting-title">حوّل المقاطع إلى أسئلة</h2><p className="setting-copy">اختر المقاطع أو حدّد أول ما يتسع، ثم وافق على إرسالها للتحليل. راجع الأسئلة المقترحة قبل اعتمادها.</p><AnalysisPanel source={source} segments={segments} selected={selected} setSelected={setSelected} onDone={() => setSelected(new Set())} /></section>}
     <section className="card setting-section"><h2 className="setting-title">اقتراحات تنتظر مراجعتك</h2><ReviewSuggestions sourceId={source.id} /></section>
+     {source.kind === 'pdf' && mcqCandidates.length > 0 && <PdfMcqReview
+       candidates={mcqCandidates}
+       isOpen={mcqReviewOpen}
+       concepts={ws.concepts.filter(concept => concept.sourceId === source.id)}
+       segments={segments.map(segment => ({ id: segment.id, page: segment.page, text: segment.text }))}
+       importedKeys={new Set(ws.questions.filter(question => question.sourceId === source.id && question.importKey).map(question => question.importKey!))}
+       suggestedTopic={mcqCandidates[0]?.prompt}
+       onSave={saveImportedQuestion}
+       onClose={() => setMcqReviewOpen(false)}
+     />}
   </div>;
 }
 
@@ -588,7 +622,7 @@ function ManualQuestionForm({ question, onClose }: { question?: Question | null;
     const options = kind === 'mcq' ? choices.split('\n').map(v => v.trim()).filter(Boolean) : [];
     if (!concept || !prompt.trim() || !answer.trim() || (kind === 'mcq' && options.length < 2)) return;
     const segment = segments.find(s => s.id === segmentId);
-    const item: Question = { id: question?.id ?? uid(), kind, prompt: prompt.trim(), choices: options, correctChoice: kind === 'mcq' ? correct : 0, answer: answer.trim(), rubric: question?.rubric ?? '', conceptId, sourceId: concept.sourceId, citation: segment ? { segmentId: segment.id } : null, location: segment ? locationLabel(segment) : 'بلا إحالة مصدرية', origin: question?.origin ?? 'manual', updatedAt: nowIso() };
+    const item: Question = { id: question?.id ?? uid(), kind, prompt: prompt.trim(), choices: options, correctChoice: kind === 'mcq' ? correct : 0, answer: answer.trim(), rubric: question?.rubric ?? '', conceptId, sourceId: concept.sourceId, citation: segment ? { segmentId: segment.id } : null, location: segment ? locationLabel(segment) : 'بلا إحالة مصدرية', origin: question?.origin ?? 'manual', updatedAt: nowIso(), importKey: question?.importKey };
     update(w => ({ ...w, sample: false, questions: question ? w.questions.map(q => q.id === question.id ? item : q) : [...w.questions, item] }));
     flash(question ? 'حُفظ تعديل السؤال، وبقيت المحاولات السابقة مرتبطة بنسختها.' : 'أُضيف السؤال المحلي. لا يصححه الذكاء الاصطناعي.');
     onClose();
