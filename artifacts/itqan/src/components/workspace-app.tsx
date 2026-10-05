@@ -188,6 +188,7 @@ function SourceReader() {
   const [mcqProgress, setMcqProgress] = useState(0);
   const [mcqError, setMcqError] = useState('');
   const [mcqNotice, setMcqNotice] = useState('');
+  const [mcqSuggestedTopic, setMcqSuggestedTopic] = useState('');
   const [mcqCandidates, setMcqCandidates] = useState<PdfMcqCandidate[]>([]);
   const [mcqPagesWithoutText, setMcqPagesWithoutText] = useState<number[]>([]);
   const [mcqReviewOpen, setMcqReviewOpen] = useState(false);
@@ -199,11 +200,16 @@ function SourceReader() {
     if (doc) setMcqRange(`1-${Math.min(doc.numPages, LIMITS.pdfPagesPerExtraction)}`);
   }, [doc]);
   useEffect(() => {
+    mcqAbort.current?.abort();
+    mcqAbort.current = null;
+    setMcqBusy(false);
+    setMcqRange('');
     setMcqCandidates([]);
     setMcqPagesWithoutText([]);
     setMcqReviewOpen(false);
     setMcqError('');
     setMcqNotice('');
+    setMcqSuggestedTopic('');
   }, [sourceId]);
   useEffect(() => () => mcqAbort.current?.abort(), []);
 
@@ -242,6 +248,7 @@ function SourceReader() {
         return [...byKey.values()].sort((a, b) => a.page - b.page || Number(a.questionNumber) - Number(b.questionNumber));
       });
       setMcqPagesWithoutText(result.pagesWithoutText);
+      setMcqSuggestedTopic(result.suggestedTopic ?? '');
       setMcqNotice(result.questions.length
         ? `عُثر على ${result.questions.length.toLocaleString('ar')} سؤال مرشح في هذا الفحص. راجع كل سؤال وحدّد إجابته قبل الحفظ.`
         : 'لم يُعثر على أسئلة اختيار من متعدد في الصفحات المحددة.');
@@ -411,7 +418,7 @@ function SourceReader() {
        concepts={ws.concepts.filter(concept => concept.sourceId === source.id)}
        segments={segments.map(segment => ({ id: segment.id, page: segment.page, text: segment.text }))}
        importedKeys={new Set(ws.questions.filter(question => question.sourceId === source.id && question.importKey).map(question => question.importKey!))}
-       suggestedTopic={mcqCandidates[0]?.prompt}
+       suggestedTopic={mcqSuggestedTopic}
        onSave={saveImportedQuestion}
        onClose={() => setMcqReviewOpen(false)}
      />}
