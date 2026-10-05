@@ -31,6 +31,11 @@ export function AnalysisPanel({ source, segments, selected, setSelected, onDone 
     for (const s of segments) { if (next.size >= caps.maxSegments || total + s.text.length > caps.maxAnalysisCharacters) break; next.add(s.id); total += s.text.length; }
     setSelected(next);
   };
+  const toggleSegment = (id: string, checked: boolean) => {
+    const next = new Set(selected);
+    if (checked) next.add(id); else next.delete(id);
+    setSelected(next);
+  };
 
   const run = async () => {
     setBusy(true); setError(''); setWarnings([]);
@@ -56,8 +61,24 @@ export function AnalysisPanel({ source, segments, selected, setSelected, onDone 
   return <div className="analysis-panel" data-testid="panel-analysis">
     {!caps.ai && <div className="notice notice-warn" role="status" data-testid="status-ai-unavailable"><ShieldAlert size={14} /> التحليل الذكي غير متاح الآن. {caps.message} يمكنك إنشاء المفاهيم والأسئلة يدويًا من المقاطع.</div>}
     <div className="analysis-meter"><span data-testid="text-analysis-count">{chosen.length} / {caps.maxSegments} مقطع</span><span className={chars > caps.maxAnalysisCharacters ? 'over' : ''}>{chars.toLocaleString('ar')} / {caps.maxAnalysisCharacters.toLocaleString('ar')} حرف</span></div>
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 12px' }}><button className="button button-secondary small" onClick={fillFirst} data-testid="button-select-fitting">اختر أول ما يتسع</button><button className="button button-quiet small" onClick={() => setSelected(new Set())} data-testid="button-clear-selection">مسح الاختيار</button></div>
-    <p className="setting-copy" style={{ margin: '0 0 10px' }}>حدّد المقاطع من قائمة النص (مربع الاختيار بجانب كل مقطع). {chosen.length > 0 && `المختار: ${[...new Set(chosen.map(locationLabel))].slice(0, 4).join('، ')}${chosen.length > 4 ? '…' : ''}`}</p>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 12px' }}><button className="button button-secondary small" onClick={fillFirst} data-testid="button-select-fitting">حدّد أول المقاطع المناسبة</button><button className="button button-quiet small" onClick={() => setSelected(new Set())} data-testid="button-clear-selection">مسح الاختيار</button></div>
+    <p className="setting-copy" style={{ margin: '0 0 10px' }}>اختر المقاطع التي تريد تحويلها. الحد في كل دفعة {caps.maxSegments} مقطعًا و{caps.maxAnalysisCharacters.toLocaleString('ar')} حرف. {chosen.length > 0 && `المختار: ${[...new Set(chosen.map(locationLabel))].slice(0, 4).join('، ')}${chosen.length > 4 ? '…' : ''}`}</p>
+    <div className="analysis-segment-list" role="group" aria-label="مقاطع المصدر للتحليل" data-testid="list-analysis-segments">
+      {segments.map((s, index) => {
+        const checked = selected.has(s.id);
+        const disabled = !checked && (chosen.length >= caps.maxSegments || chars + s.text.length > caps.maxAnalysisCharacters);
+        return <div className="analysis-segment-item" key={s.id}>
+          <label className="analysis-segment-choice">
+            <input type="checkbox" checked={checked} disabled={disabled} onChange={e => toggleSegment(s.id, e.target.checked)} aria-label={`اختيار ${locationLabel(s)} · المقطع ${index + 1}`} data-testid={`checkbox-analysis-segment-${index + 1}`} />
+            <span className="analysis-segment-copy">
+              <span className="analysis-segment-location">{locationLabel(s)} · المقطع {index + 1}</span>
+              <span className="analysis-segment-text" dir="auto">{s.text.slice(0, 240)}{s.text.length > 240 ? '…' : ''}</span>
+            </span>
+          </label>
+          {s.text.length > 240 && <details className="analysis-segment-details"><summary>عرض النص كاملًا</summary><p dir="auto">{s.text}</p></details>}
+        </div>;
+      })}
+    </div>
     {over && <div className="field-error" role="alert">قلّل الاختيار: الحد {caps.maxSegments} مقطعًا و{caps.maxAnalysisCharacters.toLocaleString('ar')} حرفًا.</div>}
     <label className="check-row consent" data-testid="label-ai-consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} disabled={!caps.ai} data-testid="checkbox-ai-consent" />
       <span>أوافق على إرسال <b>المقاطع المختارة فقط</b> ({chosen.length}) إلى OpenAI عبر تكامل Replit لاقتراح مفاهيم وأسئلة. المعالجة تستهلك رصيدًا. خادم إتقان يمرر النص مؤقتًا ولا يسجله أو يخزنه، لكن لا يمكنني ضمان سياسة احتفاظ المزود الخارجي. تعليمات داخل النص تُعامل كبيانات لا كأوامر.</span></label>

@@ -4,8 +4,8 @@ import { BookOpen, Sparkles, X, Quote } from 'lucide-react';
 import type { Citation, Segment, Source } from '@/lib/types';
 import { formatTime } from '@/lib/util';
 
-export function PageHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
-  return <div className="page-heading"><div><div className="eyebrow">{eyebrow}</div><h1 className="page-title">{title}</h1><p className="page-desc">{description}</p></div>{action}</div>;
+export function PageHeading({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description: string; action?: ReactNode }) {
+  return <div className="page-heading"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1 className="page-title">{title}</h1><p className="page-desc">{description}</p></div>{action}</div>;
 }
 
 export function SampleNote() {

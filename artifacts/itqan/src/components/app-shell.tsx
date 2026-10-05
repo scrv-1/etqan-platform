@@ -18,7 +18,7 @@ export function AppShell({ children, page, dark, toggleTheme }: { children: Reac
   const section = page.startsWith('/sources/') ? '/sources' : page;
   const nav = (mobile = false) => <nav aria-label="التنقل الرئيسي" className={mobile ? 'mobile-nav' : 'nav-group'}>{navItems.map(({ href, label, Icon, id }) => <Link key={href} href={href} data-testid={`nav-${id}${mobile ? '-mobile' : ''}`} className={`nav-link ${section === href ? 'active' : ''}`} aria-current={section === href ? 'page' : undefined}><Icon size={18} /><span className="nav-label">{label}</span></Link>)}</nav>;
   return <div className="app-shell" dir="rtl">
-    <aside className="sidebar"><Link href="/" className="brand" data-testid="link-brand"><span className="brand-mark">إ</span><span><span className="brand-name">إتقان</span><span className="brand-sub">LEARN, IN YOUR OWN WORDS</span></span></Link>{nav()}
+    <aside className="sidebar"><Link href="/" className="brand" data-testid="link-brand"><span className="brand-mark">إ</span><span><span className="brand-name">إتقان</span><span className="brand-sub">تعلّم بكلماتك</span></span></Link>{nav()}
       <div className="side-bottom"><span className={`storage-dot ${save.status === 'error' ? 'is-error' : ''}`} /> {save.status === 'error' ? 'تعذر الحفظ على هذا الجهاز' : 'بياناتك محفوظة على هذا الجهاز'}<br /><span style={{ fontSize: 10 }}>تخزين المتصفح المحلي، بلا حساب أو مزامنة. انسخ احتياطيًا بنفسك.</span></div></aside>
     <main className="main-area">
       <header className="topbar"><span className="crumb">مساحتك الشخصية <span style={{ opacity: .5 }}> / </span> {page.startsWith('/sources/') ? 'قارئ المصدر' : titles[page] || 'إتقان'}</span>

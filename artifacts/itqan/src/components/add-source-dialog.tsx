@@ -85,7 +85,7 @@ function FileTab({ onClose }: { onClose: () => void }) {
       if (k === 'pdf') {
         const { doc, labels } = await openPdf(buf);
         setPdf({ doc, labels, pages: doc.numPages });
-        setRange(`1-${Math.min(doc.numPages, 10)}`);
+        setRange(`1-${Math.min(doc.numPages, LIMITS.pdfPagesPerExtraction)}`);
       }
       setPhase('idle');
     } catch (e) { setError(e instanceof Error ? e.message : 'تعذر قراءة الملف'); setPhase('failed'); }
@@ -136,8 +136,8 @@ function FileTab({ onClose }: { onClose: () => void }) {
     {dup && <Duplicate source={dup} onClose={onClose} />}
     {file && !dup && phase !== 'reading' && <div className="form-grid" style={{ marginTop: 16 }}>
       <div className="field full"><label htmlFor="file-title">عنوان المصدر</label><input id="file-title" value={title} onChange={e => setTitle(e.target.value)} data-testid="input-file-title" /></div>
-      {pdf && <><div className="field"><label htmlFor="pdf-range">الصفحات المراد استخراج نصها</label><input id="pdf-range" dir="ltr" value={range} onChange={e => setRange(e.target.value)} placeholder="1-10, 15" data-testid="input-pdf-range" /></div>
-        <div className="notice" style={{ alignSelf: 'end' }}>الملف {pdf.pages} صفحة. حدد فصلًا أو مجموعة صفحات (حتى {LIMITS.pdfPagesPerExtraction}). يُحفظ الملف كاملًا للقراءة، والإحالات بترقيم صفحات الملف.</div>
+       {pdf && <><div className="field"><label htmlFor="pdf-range">الصفحات المراد استخراج نصها</label><input id="pdf-range" dir="ltr" value={range} onChange={e => setRange(e.target.value)} placeholder="1-30, 35" data-testid="input-pdf-range" /></div>
+         <div className="notice" style={{ alignSelf: 'end' }}>الملف {pdf.pages} صفحة. يبدأ الاستخراج بأول {LIMITS.pdfPagesPerExtraction} صفحة كحد أقصى؛ يمكنك استخراج بقية الصفحات من القارئ على دفعات. يُحفظ الملف كاملًا محليًا.</div>
         {rangeError && <div className="field-error full" role="alert">{rangeError}</div>}</>}
     </div>}
     {phase === 'extracting' && <div style={{ marginTop: 14 }}><ProgressBar value={progress} label="تقدم الاستخراج" /><div className="proc-line"><LoaderCircle size={14} className="spin" /> {kind === 'pdf' ? `استخراج النص… ${Math.round(progress * 100)}%` : 'استخراج النص…'}</div></div>}

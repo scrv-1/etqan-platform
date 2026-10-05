@@ -14,6 +14,7 @@ import { AnalysisPanel } from './analysis-panel';
 import { BackupPanel } from './backup-panel';
 import { Empty, PageHeading, SampleNote, locationLabel } from './common';
 import { PdfCanvas, usePdfDoc } from './pdf-viewer';
+import { PdfMorePages } from './pdf-more-pages';
 import { useWorkspace, WorkspaceProvider } from '@/state/workspace';
 import { useCapabilities } from '@/state/capabilities';
 import { extractPageText } from '@workspace/api-client-react';
@@ -98,12 +99,16 @@ function HomePage() {
   const next = ws.questions.find(q => !ws.evidence.some(e => e.questionId === q.id)) ?? ws.questions[0];
   const dueCount = dueReviewIds(ws.questions, ws.evidence).length;
   return <div className="content">
-    <PageHeading eyebrow="YOUR OWN LEARNING SPACE" title="أهلًا بك في إتقان" description="ابدأ بمصدر، اربط الأفكار، ثم اختبر ما تستطيع استرجاعه." action={<Link className="button button-primary" href="/sources" data-testid="button-add-source"><Plus size={15} /> أضف مصدرًا</Link>} />
+    <PageHeading title="أهلًا بك في إتقان" description="ابدأ بمصدر، اربط الأفكار، ثم اختبر ما تستطيع استرجاعه." action={<Link className="button button-primary" href="/sources" data-testid="button-add-source"><Plus size={15} /> أضف مصدرًا</Link>} />
     {ws.sample && <SampleNote />}
-    <section className="home-hero" data-testid="panel-today">
-      <div className="hero-copy"><span className="hero-kicker">LEARN FROM YOUR SOURCES</span><h2 className="hero-title">المعرفة التي تسترجعها،<br />تصبح أقرب إليك.</h2><p className="hero-sub">مقاطع ومراجع واضحة، وممارسة مستقلة عن المساعدة الذكية.</p>
-      <Link href={next ? '/study' : '/sources'} className="button button-secondary" data-testid="button-start-study">{next ? 'ابدأ جلسة استرجاع' : 'أضف مصدرًا أولًا'} <ArrowLeft size={15} /></Link></div>
-      <div className="hero-art" aria-hidden="true"><div className="orbit" /><div className="orbit" /><div className="orbit-dot" /><div className="hero-core">إ</div></div>
+    <section className="home-hero" data-testid="panel-today" aria-label="ابدأ التعلّم">
+      <div className="hero-copy"><h2 className="hero-title">المعرفة التي تسترجعها،<br />تصبح أقرب إليك.</h2><p className="hero-sub">مقاطع ومراجع واضحة، وممارسة مستقلة عن المساعدة الذكية.</p>
+      <Link href={next ? '/study' : '/sources'} className="button button-secondary" data-testid="button-start-study">{next ? 'ابدأ جلسة استرجاع' : 'أضف مصدرًا أولًا'} <ArrowLeft size={15} aria-hidden="true" /></Link></div>
+      <ol className="learning-path" aria-label="من المصدر إلى الفكرة ثم الاسترجاع">
+        <li className="learning-step"><span className="learning-step-number" aria-hidden="true">١</span><span>مصدر</span></li>
+        <li className="learning-step"><span className="learning-step-number" aria-hidden="true">٢</span><span>فكرة</span></li>
+        <li className="learning-step"><span className="learning-step-number" aria-hidden="true">٣</span><span>استرجاع</span></li>
+      </ol>
     </section>
     <div className="stats-strip" aria-label="ملخص المساحة">
       <Stat icon={<BookOpen size={18} />} value={ws.sources.length} label="مصدر محفوظ محليًا" />
@@ -111,10 +116,10 @@ function HomePage() {
       <Stat icon={<ChartNoAxesColumnIncreasing size={18} />} value={ws.evidence.length} label="استجابة مسجلة كدليل" />
     </div>
     <div className="section-head"><h2 className="section-title">خطوتك التالية</h2></div>
-    <div className="next-grid">
-      <Link href={next ? '/study' : '/sources'} className="card action-card" style={{ textDecoration: 'none', color: 'inherit' }}><span className="action-icon"><Brain size={20} /></span><span className="row-main"><span className="action-title">{next ? `راجع: ${next.prompt}` : 'أضف أول مصدر'}</span><span className="action-caption">{next ? 'لا تظهر الإجابة قبل محاولتك.' : 'PDF أو مستند أو صفحة ويب أو نص.'}</span></span><ChevronLeft size={17} /></Link>
-      {dueCount > 0 && <Link href="/study?due=1" className="card action-card" style={{ textDecoration: 'none', color: 'inherit' }} data-testid="button-review-due"><span className="action-icon"><Brain size={20} /></span><span className="row-main"><span className="action-title">مراجعة مستحقة</span><span className="action-caption">{dueCount.toLocaleString('ar')} سؤالًا جديدًا أو حان موعد استرجاعه.</span></span><ChevronLeft size={17} /></Link>}
-      <Link href="/knowledge" className="card action-card" style={{ textDecoration: 'none', color: 'inherit' }}><span className="action-icon"><Network size={20} /></span><span><span className="action-title">شبكة الأفكار</span><span className="action-caption">{ws.concepts.length} مفهومًا و{ws.relations.length} علاقة؛ راجع ما هو مقترح قبل اعتماده.</span></span><ArrowDownLeft size={17} /></Link>
+    <div className={`next-grid${dueCount > 0 ? ' has-due-review' : ''}`}>
+      <Link href={next ? '/study' : '/sources'} className="card action-card action-card-question" data-testid="link-next-question"><span className="action-icon" aria-hidden="true"><Brain size={20} /></span><span className="row-main"><span className="action-title" data-testid="text-next-question">{next ? `راجع: ${next.prompt}` : 'أضف أول مصدر'}</span><span className="action-caption">{next ? 'لا تظهر الإجابة قبل محاولتك.' : 'PDF أو مستند أو صفحة ويب أو نص.'}</span></span><ChevronLeft size={17} aria-hidden="true" /></Link>
+      {dueCount > 0 && <Link href="/study?due=1" className="card action-card action-card-due" data-testid="button-review-due"><span className="action-icon" aria-hidden="true"><Brain size={20} /></span><span className="row-main"><span className="action-title">مراجعة مستحقة</span><span className="action-caption">{dueCount.toLocaleString('ar')} سؤالًا جديدًا أو حان موعد استرجاعه.</span></span><span className="due-count" aria-hidden="true">{dueCount.toLocaleString('ar')}</span><ChevronLeft size={17} aria-hidden="true" /></Link>}
+      <Link href="/knowledge" className="card action-card action-card-knowledge" data-testid="button-knowledge-map"><span className="action-icon" aria-hidden="true"><Network size={20} /></span><span className="row-main"><span className="action-title">شبكة الأفكار</span><span className="action-caption">{ws.concepts.length.toLocaleString('ar')} مفاهيم و{ws.relations.length.toLocaleString('ar')} علاقات؛ راجع ما هو مقترح قبل اعتماده.</span></span><ArrowDownLeft size={17} aria-hidden="true" /></Link>
     </div>
     <div className="notice" style={{ marginTop: 18 }}><ShieldCheck size={15} style={{ verticalAlign: 'middle', marginLeft: 7 }} /> المحتوى يبقى في هذا المتصفح. التحليل وOCR لا يرسلان شيئًا دون موافقتك الصريحة.</div>
     {!caps.ai && <p className="setting-copy" style={{ marginTop: 10 }}>التحليل الذكي غير متاح حاليًا؛ ما زال بإمكانك إنشاء المفاهيم والأسئلة يدويًا.</p>}
@@ -192,7 +197,13 @@ function SourceReader() {
     if (!text) return;
     const order = segments.reduce((n, s) => Math.max(n, s.order), -1) + 1;
     const segment: Segment = { id: `${source.id}:ocr:${page}:${uid()}`, sourceId: source.id, order, text, page, printedPage: labels?.[page - 1] && labels[page - 1] !== String(page) ? labels[page - 1] : undefined, origin: 'ocr-reviewed' };
-    update(w => ({ ...w, sample: false, segments: [...w.segments, segment], sources: w.sources.map(s => s.id === source.id ? { ...s, scannedPages: (s.scannedPages ?? []).filter(n => n !== page), extractedPages: [...new Set([...(s.extractedPages ?? []), page])], updatedAt: nowIso() } : s) }));
+    update(w => ({ ...w, sample: false, segments: [...w.segments, segment], sources: w.sources.map(s => {
+      if (s.id !== source.id) return s;
+      const scannedPages = (s.scannedPages ?? []).filter(n => n !== page);
+      const warnings = (s.warnings ?? []).filter(warning => !/^\d+ صفحة بلا طبقة نصية/.test(warning));
+      if (scannedPages.length) warnings.push(`${scannedPages.length} صفحة بلا طبقة نصية (ممسوحة ضوئيًا على الأرجح): ${scannedPages.slice(0, 12).join('، ')}${scannedPages.length > 12 ? '…' : ''}`);
+      return { ...s, scannedPages, warnings, extractedPages: [...new Set([...(s.extractedPages ?? []), page])], updatedAt: nowIso() };
+    }) }));
     setActive(segment.id); setOcrText(''); setOcrWarnings([]); flash('أُضيف النص بعد مراجعتك وربطه بالصفحة.'); 
   };
   const requestOcr = async () => {
@@ -223,13 +234,13 @@ function SourceReader() {
           {ocrWarnings.map(w => <div key={w} className="notice notice-warn">{w}</div>)}
           <div className="field"><label htmlFor="ocr-text">راجع النص المستخرج أو اكتبه يدويًا</label><textarea id="ocr-text" value={ocrText} onChange={e => setOcrText(e.target.value)} placeholder="قارن كل سطر بصورة الصفحة قبل إضافته…" /></div>
           <button className="button button-primary" disabled={!ocrText.trim()} onClick={appendOcr}>أضف النص بعد المراجعة</button>
-        </div>}
-      </div></>}
+         </div>}
+       </div><PdfMorePages source={source} doc={doc} labels={labels} /></>}
     </section>}
     {source.kind === 'youtube' && <section className="card setting-section"><h2 className="setting-title">تفريغ الفيديو</h2><p className="setting-copy">التفريغ المرفق يدويًا أو المستورد من SRT/VTT محفوظ محليًا. لا يوجد استيراد تلقائي للتحويل الكلامي من YouTube في هذا الإصدار.</p><a className="button button-secondary" href={`https://www.youtube.com/watch?v=${source.videoId}`} target="_blank" rel="noreferrer">افتح الفيديو على YouTube <ArrowDownLeft size={14} /></a></section>}
     {source.kind !== 'pdf' && <section className="card setting-section"><h2 className="setting-title">مقاطع المصدر</h2>{segments.length ? <div className="segment-list">{segments.map(s => <button className={`card segment-row ${active === s.id ? 'is-active' : ''}`} key={s.id} onClick={() => goToSegment(s)}><span>{s.text}</span><span className="tag">{locationLabel(s)}{s.startSeconds !== undefined ? ` · ${formatTime(s.startSeconds)}` : ''}</span></button>)}</div> : <Empty title="لا يوجد نص مستخرج" copy="تحقق من أن المصدر يحتوي على محتوى نصي." />}</section>}
     {selectedSegment && <div className="notice" data-testid="panel-active-citation"><b>الإحالة المحددة · {locationLabel(selectedSegment)}</b><blockquote className="preview-quote" dir="auto">{selectedSegment.text}</blockquote></div>}
-    {segments.length > 0 && <section className="card setting-section" style={{ marginTop: 16 }}><h2 className="setting-title">اقترح عناصر تعلم</h2><p className="setting-copy">اختر المقاطع بعناية. لا يُرسل شيء قبل الموافقة؛ كل مقترح يحتاج مراجعتك.</p><AnalysisPanel source={source} segments={segments} selected={selected} setSelected={setSelected} onDone={() => setSelected(new Set())} /></section>}
+     {segments.length > 0 && <section className="card setting-section" style={{ marginTop: 16 }}><h2 className="setting-title">حوّل المقاطع إلى أسئلة</h2><p className="setting-copy">اختر المقاطع أو حدّد أول ما يتسع، ثم وافق على إرسالها للتحليل. راجع الأسئلة المقترحة قبل اعتمادها.</p><AnalysisPanel source={source} segments={segments} selected={selected} setSelected={setSelected} onDone={() => setSelected(new Set())} /></section>}
     <section className="card setting-section"><h2 className="setting-title">اقتراحات تنتظر مراجعتك</h2><ReviewSuggestions sourceId={source.id} /></section>
   </div>;
 }
