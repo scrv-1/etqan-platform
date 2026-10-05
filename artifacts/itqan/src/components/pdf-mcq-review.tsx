@@ -5,6 +5,7 @@ import './pdf-mcq-review.css';
 
 type PdfMcqReviewProps = {
   candidates: PdfMcqCandidate[];
+  isOpen: boolean;
   concepts: { id: string; title: string }[];
   segments: { id: string; page?: number; text: string }[];
   importedKeys: Set<string>;
@@ -45,6 +46,7 @@ function makeDraft(candidate: PdfMcqCandidate, segments: PdfMcqReviewProps['segm
 
 export function PdfMcqReview({
   candidates,
+  isOpen,
   concepts,
   segments,
   importedKeys,
@@ -78,6 +80,7 @@ export function PdfMcqReview({
     && !alreadySaved;
 
   useEffect(() => {
+    if (!isOpen) return;
     dialogRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeRef.current();
@@ -86,7 +89,7 @@ export function PdfMcqReview({
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [candidates.length]);
+  }, [candidates.length, isOpen]);
 
   const updateDraft = (update: Partial<ReviewDraft>) => {
     if (!candidate || !draft) return;
@@ -112,6 +115,8 @@ export function PdfMcqReview({
     setSavedKeys(current => new Set(current).add(candidate.importKey));
     if (index < candidates.length - 1) moveTo(index + 1);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="pdf-mcq-review__backdrop" onMouseDown={event => {
