@@ -106,7 +106,7 @@ function matchSegment(prompt: string, page: number, segments: Segment[]) {
   const pageSegments = segments.filter(segment => segment.page === page);
   const normalizedPrompt = normalizeText(prompt);
   const prefix = normalizedPrompt.slice(0, Math.min(36, normalizedPrompt.length));
-  return pageSegments.find(segment => prefix && normalizeText(segment.text).includes(prefix))?.id ?? pageSegments[0]?.id;
+  return pageSegments.find(segment => prefix && normalizeText(segment.text).includes(prefix))?.id;
 }
 
 function plainTextLines(page: number, text: string): PdfMcqLine[] {
