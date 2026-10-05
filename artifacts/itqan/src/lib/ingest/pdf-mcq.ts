@@ -198,33 +198,47 @@ export function parsePdfMcqLines(lines: PdfMcqLine[], segments: Segment[] = []) 
   };
 }
 
-export async function extractPdfMcqs(doc: PdfDoc, pages: number[], segments: Segment[]): Promise<PdfMcqExtraction> {
+export async function extractPdfMcqs(
+  doc: PdfDoc,
+  pages: number[],
+  segments: Segment[],
+  onProgress?: (done: number, total: number) => void,
+  signal?: AbortSignal,
+): Promise<PdfMcqExtraction> {
   const lines: PdfMcqLine[] = [];
   const pagesWithoutText: number[] = [];
-  for (const pageNumber of [...new Set(pages)].sort((a, b) => a - b)) {
+  const orderedPages = [...new Set(pages)].sort((a, b) => a - b);
+  for (let index = 0; index < orderedPages.length; index++) {
+    if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+    const pageNumber = orderedPages[index];
     const page = await doc.getPage(pageNumber);
-    const width = page.getViewport({ scale: 1 }).width;
-    const content = await page.getTextContent();
-    const parts: (TextPart & { y: number })[] = [];
-    for (const item of content.items) {
-      if (!('str' in item)) continue;
-      const textItem = item as unknown as { str: string; transform: number[]; width?: number; hasEOL?: boolean };
-      const x = textItem.transform[4] ?? 0;
-      const y = textItem.transform[5] ?? 0;
-      const text = textItem.str ?? '';
-      // Right-aligned point marks such as "/1" are scoring metadata, not question text.
-      if (/^\/\s*\d+(?:\.\d+)?$/u.test(text.trim()) && x >= width * 0.6) continue;
-      parts.push({ x, y, width: textItem.width ?? 0, text, hasEOL: !!textItem.hasEOL });
+    try {
+      const width = page.getViewport({ scale: 1 }).width;
+      const content = await page.getTextContent();
+      const parts: (TextPart & { y: number })[] = [];
+      for (const item of content.items) {
+        if (!('str' in item)) continue;
+        const textItem = item as unknown as { str: string; transform: number[]; width?: number; hasEOL?: boolean };
+        const x = textItem.transform[4] ?? 0;
+        const y = textItem.transform[5] ?? 0;
+        const text = textItem.str ?? '';
+        // Right-aligned point marks such as "/1" are scoring metadata, not question text.
+        if (/^\/\s*\d+(?:\.\d+)?$/u.test(text.trim()) && x >= width * 0.6) continue;
+        parts.push({ x, y, width: textItem.width ?? 0, text, hasEOL: !!textItem.hasEOL });
+      }
+      const pageLines = makeLines(pageNumber, parts);
+      if (!pageLines.length) {
+        pagesWithoutText.push(pageNumber);
+        const reviewedText = segments.filter(segment => segment.page === pageNumber && segment.origin === 'ocr-reviewed');
+        for (const segment of reviewedText) lines.push(...plainTextLines(pageNumber, segment.text));
+      } else {
+        lines.push(...pageLines);
+      }
+    } finally {
+      page.cleanup();
     }
-    const pageLines = makeLines(pageNumber, parts);
-    if (!pageLines.length) {
-      pagesWithoutText.push(pageNumber);
-      const reviewedText = segments.filter(segment => segment.page === pageNumber && segment.origin === 'ocr-reviewed');
-      for (const segment of reviewedText) lines.push(...plainTextLines(pageNumber, segment.text));
-    } else {
-      lines.push(...pageLines);
-    }
-    page.cleanup();
+    onProgress?.(index + 1, orderedPages.length);
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   const parsed = parsePdfMcqLines(lines, segments);
