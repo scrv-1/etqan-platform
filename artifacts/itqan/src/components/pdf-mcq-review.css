@@ -1,0 +1,417 @@
+.pdf-mcq-review__backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: hsl(var(--foreground) / .42);
+  backdrop-filter: blur(3px);
+}
+
+.pdf-mcq-review {
+  width: min(790px, 100%);
+  max-height: min(92dvh, 900px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 80px hsl(var(--foreground) / .18);
+  animation: pdf-mcq-enter .2s ease-out both;
+}
+
+.pdf-mcq-review__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 23px 26px 19px;
+  border-bottom: 1px solid hsl(var(--border));
+  background: linear-gradient(115deg, hsl(var(--muted) / .8), hsl(var(--card)) 66%);
+}
+
+.pdf-mcq-review__heading {
+  min-width: 0;
+}
+
+.pdf-mcq-review__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  color: hsl(var(--accent));
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pdf-mcq-review__header h2 {
+  margin: 0 0 5px;
+  font: 600 22px/1.45 var(--app-font-serif);
+  color: hsl(var(--foreground));
+}
+
+.pdf-mcq-review__header p {
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+
+.pdf-mcq-review__navigator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 26px;
+  background: hsl(var(--background));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.pdf-mcq-review__counter {
+  display: block;
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pdf-mcq-review__counter span {
+  margin: 0 3px;
+  color: hsl(var(--muted-foreground));
+  font-weight: 400;
+}
+
+.pdf-mcq-review__source-meta {
+  display: block;
+  margin-top: 3px;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+}
+
+.pdf-mcq-review__step-controls,
+.pdf-mcq-review__footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdf-mcq-review__step-controls .button {
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.pdf-mcq-review__step-controls .button:disabled,
+.pdf-mcq-review__remove:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+  transform: none;
+}
+
+.pdf-mcq-review__body {
+  overflow-y: auto;
+  padding: 22px 26px 25px;
+}
+
+.pdf-mcq-review__notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  margin-bottom: 16px;
+  border: 1px solid hsl(var(--primary) / .22);
+  border-radius: 9px;
+  background: hsl(var(--primary) / .07);
+  color: hsl(var(--primary));
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.pdf-mcq-review__notice--duplicate {
+  border-color: hsl(var(--accent) / .34);
+  background: hsl(var(--accent) / .1);
+  color: hsl(var(--foreground));
+}
+
+.pdf-mcq-review__notice--duplicate svg {
+  flex: none;
+  color: hsl(var(--accent));
+}
+
+.pdf-mcq-review__field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.pdf-mcq-review__field > label,
+.pdf-mcq-review__options legend {
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pdf-mcq-review__field textarea,
+.pdf-mcq-review__field input,
+.pdf-mcq-review__field select,
+.pdf-mcq-review__choice-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid hsl(var(--input));
+  border-radius: 8px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.pdf-mcq-review__field textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.pdf-mcq-review__field textarea:focus,
+.pdf-mcq-review__field input:focus,
+.pdf-mcq-review__field select:focus,
+.pdf-mcq-review__choice-input:focus {
+  border-color: hsl(var(--primary));
+}
+
+.pdf-mcq-review__options {
+  min-width: 0;
+  margin: 21px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.pdf-mcq-review__options legend {
+  width: 100%;
+  margin-bottom: 9px;
+}
+
+.pdf-mcq-review__options legend span {
+  margin-right: 7px;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.pdf-mcq-review__option-list {
+  display: grid;
+  gap: 7px;
+}
+
+.pdf-mcq-review__option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 6px 8px 6px 5px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9px;
+  background: hsl(var(--background));
+  transition: border-color .16s, background .16s;
+}
+
+.pdf-mcq-review__option.is-correct {
+  border-color: hsl(var(--primary) / .52);
+  background: hsl(var(--primary) / .055);
+}
+
+.pdf-mcq-review__radio-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  cursor: pointer;
+}
+
+.pdf-mcq-review__radio-label input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: hsl(var(--primary));
+  cursor: pointer;
+}
+
+.pdf-mcq-review__choice-letter {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 7px;
+  color: hsl(var(--muted-foreground));
+  font: 11px var(--app-font-mono);
+  direction: ltr;
+}
+
+.is-correct .pdf-mcq-review__choice-letter {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.pdf-mcq-review__choice-input {
+  border-color: transparent;
+  background: transparent;
+  padding: 7px 5px;
+}
+
+.pdf-mcq-review__remove {
+  flex: none;
+  color: hsl(var(--muted-foreground));
+}
+
+.pdf-mcq-review__remove:not(:disabled):hover {
+  color: hsl(var(--destructive));
+  background: hsl(var(--destructive) / .08);
+}
+
+.pdf-mcq-review__add-option {
+  margin-top: 7px;
+  font-size: 11px;
+}
+
+.pdf-mcq-review__hint {
+  display: block;
+  margin-top: 7px;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+}
+
+.pdf-mcq-review__details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 21px;
+  padding-top: 19px;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.pdf-mcq-review__sub-label {
+  margin-top: 5px;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+}
+
+.pdf-mcq-review__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 15px 26px;
+  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+}
+
+.pdf-mcq-review__save-hint {
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.pdf-mcq-review__footer .button:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+  transform: none;
+}
+
+.pdf-mcq-review__empty {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  padding: 55px 24px 59px;
+}
+
+.pdf-mcq-review__empty-mark {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 16px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 18px 18px 18px 5px;
+  background: hsl(var(--muted));
+  color: hsl(var(--primary));
+}
+
+.pdf-mcq-review__empty h3 {
+  margin: 0 0 7px;
+  font: 600 19px var(--app-font-serif);
+}
+
+.pdf-mcq-review__empty p {
+  max-width: 320px;
+  margin: 0 0 19px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+@keyframes pdf-mcq-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .pdf-mcq-review__backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .pdf-mcq-review {
+    width: 100%;
+    max-height: 96dvh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .pdf-mcq-review__header {
+    padding: 18px 18px 15px;
+  }
+
+  .pdf-mcq-review__header h2 {
+    font-size: 19px;
+  }
+
+  .pdf-mcq-review__navigator {
+    padding: 11px 18px;
+  }
+
+  .pdf-mcq-review__body {
+    padding: 18px;
+  }
+
+  .pdf-mcq-review__details {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .pdf-mcq-review__footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .pdf-mcq-review__footer-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 390px) {
+  .pdf-mcq-review__step-controls .button {
+    padding: 7px;
+    font-size: 10px;
+  }
+
+  .pdf-mcq-review__step-controls .button svg {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pdf-mcq-review,
+  .pdf-mcq-review__option {
+    animation: none;
+    transition: none;
+  }
+}
