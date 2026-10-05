@@ -203,7 +203,6 @@ function SourceReader() {
     mcqAbort.current?.abort();
     mcqAbort.current = null;
     setMcqBusy(false);
-    setMcqRange('');
     setMcqCandidates([]);
     setMcqPagesWithoutText([]);
     setMcqReviewOpen(false);

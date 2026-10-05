@@ -1,1 +1,2 @@
 - [PDF.js document cleanup](pdfjs-document-cleanup.md) — `PDFDocumentLoadingTask`, not `PDFDocumentProxy`, owns worker destruction in the installed PDF.js version.
+- [Node PDF extraction probes](pdfjs-node-test-probe.md) — test real PDFs with PDF.js legacy worker; Vite’s `?url` worker import is not a valid direct Node `workerSrc`.
